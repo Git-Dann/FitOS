@@ -3,18 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { associates, products, requests, rooms, scenarios, type Product, type Request } from "./data";
+import { associates, products, requests, rooms, type Product, type Request } from "./data";
 import { useScenario } from "./scenario-context";
 
 const money = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
 
 export function Header() {
   const path = usePathname();
-  const { scenario, setScenario, reset } = useScenario();
   const links = [{ href: "/platform", label: "Platform" }, { href: "/demo", label: "Demo" }, { href: "/demo/customer", label: "Customer" }, { href: "/demo/associate", label: "Associate" }, { href: "/demo/manager", label: "Manager" }, { href: "/pilot", label: "Pilot" }];
-  const nextScenario = scenarios[(scenarios.indexOf(scenario) + 1) % scenarios.length];
 
-  return <header className="site-header"><Link className="brand" href="/"><span className="brand-mark">F</span><span>FitOS</span></Link><nav>{links.map(link => <Link className={path === link.href ? "active" : ""} href={link.href} key={link.href}>{link.label}</Link>)}</nav><div className="scenario-control"><span className="scenario-label">Demo state</span><button className="scenario-button" onClick={() => setScenario(nextScenario)} aria-label={`Change demo scenario. Current scenario: ${scenario}. Next scenario: ${nextScenario}.`}><span>{scenario}</span><small>Change scenario</small></button><button className="reset-button" onClick={reset} aria-label="Reset scenario">↺</button></div></header>;
+  return <header className="site-header"><Link className="brand" href="/"><span className="brand-mark">F</span><span>FitOS</span></Link><nav>{links.map(link => <Link className={path === link.href ? "active" : ""} href={link.href} key={link.href}>{link.label}</Link>)}</nav></header>;
 }
 
 function Footer() { return <footer><span>FitOS prototype · retail operations, not a customer-facing shop</span><span>Local demonstration data</span></footer>; }

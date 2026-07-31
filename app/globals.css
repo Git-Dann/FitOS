@@ -13,13 +13,15 @@ select::-ms-expand { display:none; }
 .device-screen b { margin:28px 0 14px!important; font-variant-numeric:tabular-nums; letter-spacing:.11em!important; }
 .device-screen i { align-self:center; width:min(100%,182px)!important; height:62px!important; margin:0 auto 18px!important; transform:none!important; color:transparent!important; font-size:0!important; letter-spacing:0!important; background:linear-gradient(90deg,transparent 0 7px,#17382f 7px 9px,transparent 9px 12px,#17382f 12px 16px,transparent 16px 18px,#17382f 18px 19px,transparent 19px 23px,#17382f 23px 27px,transparent 27px 30px,#17382f 30px 32px,transparent 32px 35px,#17382f 35px 36px,transparent 36px 39px,#17382f 39px 43px,transparent 43px 46px,#17382f 46px 48px,transparent 48px 53px,#17382f 53px 56px,transparent 56px 58px,#17382f 58px 59px,transparent 59px 64px,#17382f 64px 68px,transparent 68px 71px,#17382f 71px 73px,transparent 73px 76px,#17382f 76px 80px,transparent 80px 82px,#17382f 82px 83px,transparent 83px 87px,#17382f 87px 90px,transparent 90px 94px,#17382f 94px 96px,transparent 96px 99px,#17382f 99px 103px,transparent 103px 105px,#17382f 105px 108px,transparent 108px 112px,#17382f 112px 113px,transparent 113px 116px,#17382f 116px 120px,transparent 120px 122px,#17382f 122px 125px,transparent 125px 129px,#17382f 129px 131px,transparent 131px 135px,#17382f 135px 139px,transparent 139px 141px,#17382f 141px 143px,transparent 143px 148px,#17382f 148px 151px,transparent 151px 154px,#17382f 154px 156px,transparent 156px 160px,#17382f 160px 164px,transparent 164px 167px,#17382f 167px 169px,transparent 169px 175px)!important; }
 
-/* The header state control is an explicit action, not a disguised dropdown. */
-.scenario-button { display:grid; gap:1px; min-width:198px; padding:8px 12px; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink); text-align:left; }
-.scenario-button span { font-size:12px; font-weight:700; }
-.scenario-button small { font-size:9px; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; }
-.scenario-button:hover { border-color:#7ca590; background:#f7fbf7; }
-.scenario-button:focus-visible { outline:2px solid var(--green)!important; outline-offset:2px!important; box-shadow:0 0 0 4px #dff0e5!important; }
-@media(max-width:680px) { .scenario-button { min-width:142px; padding:7px 9px; } }
+/* Product imagery replaces the placeholder initial tiles in the marketing panel. */
+.recommendation-board { padding:14px!important; }
+.recommendation-board > p { margin:0 0 8px!important; }
+.recommendation-board article { gap:12px!important; padding:8px 0!important; }
+.recommendation-swatch { width:68px!important; height:78px!important; flex:0 0 68px; background-position:center; background-size:cover; }
+.recommendation-swatch span { display:none; }
+.recommendation-swatch.tee { background-image:url("/images/white-heavyweight-tee.png")!important; }
+.recommendation-swatch.overshirt { background-image:url("/images/textured-overshirt.png")!important; }
+.recommendation-swatch.jacket { background-image:url("/images/field-jacket.png")!important; }
 .site-header { height:76px; padding:0 max(24px,calc((100vw - 1280px)/2)); display:flex; align-items:center; gap:36px; border-bottom:1px solid var(--line); background:rgba(247,248,245,.94); position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); }
 .brand { display:flex; align-items:center; gap:9px; font-weight:740; font-size:20px; letter-spacing:-.06em; }.brand-mark{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--green);color:white;font-size:15px;letter-spacing:0}
 nav { display:flex; align-items:center; gap:26px; flex:1; } nav a{font-size:14px;color:var(--muted)}nav a:hover,nav a.active{color:var(--ink);font-weight:650}.scenario-control{display:flex;align-items:center;gap:7px}.scenario-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}.scenario-control select{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink);font-size:12px}.reset-button{border:0;background:transparent;color:var(--muted);font-size:20px;padding:2px 5px}.reset-button:hover{color:var(--green)}
