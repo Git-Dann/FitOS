@@ -29,22 +29,41 @@ const phases = [
   ["04", "Decide", "Stop, extend or plan rollout."],
 ];
 
+const scopePlans = {
+  "6–8 rooms": {
+    duration: "4 weeks",
+    cover: "One fitting-room colleague at peak",
+    readout: "Best for proving the hand-off and service promise quickly.",
+  },
+  "9–14 rooms": {
+    duration: "6 weeks",
+    cover: "Two colleagues across peak periods",
+    readout: "Recommended balance of demand signal and operational control.",
+  },
+  "14+ rooms": {
+    duration: "8 weeks",
+    cover: "Dedicated floor and stockroom cover",
+    readout: "Use when multiple fitting-room zones need to be compared.",
+  },
+};
+
 function PilotStyles() {
   return (
     <style>{`
-    .pilot-reframed{max-width:1180px;margin:auto;padding:56px 28px 84px}.pilot-kicker{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px}.pilot-kicker>span{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#668177}.pilot-reframed h1{max-width:760px;font-size:clamp(49px,6.2vw,82px);line-height:.9;letter-spacing:-.085em;margin:0}.pilot-lede-reframed{max-width:630px;margin:20px 0 27px;color:#66716e;font-size:17px;line-height:1.55}.pilot-hero-actions{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.pilot-hero-actions .text-link{color:#2e6552;font-size:12px;font-weight:800}.pilot-fact-row{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:48px}.pilot-fact-row article{border-top:2px solid #78a18e;padding:13px 3px 0}.pilot-fact-row span{display:block;color:#688177;font-size:10px;font-weight:800;letter-spacing:.1em}.pilot-fact-row b{display:block;margin:15px 0 5px;font-size:22px;letter-spacing:-.05em}.pilot-fact-row small{color:#697873;font-size:11px;line-height:1.35}.pilot-brief{display:grid;grid-template-columns:.85fr 1.15fr;gap:44px;margin-top:70px;padding:31px;background:#eef3ef;border-radius:16px}.pilot-brief .eyebrow{margin:0 0 10px}.pilot-brief h2,.pilot-section h2{font-size:clamp(30px,3.6vw,47px);line-height:1;letter-spacing:-.065em;margin:0}.pilot-brief p:not(.eyebrow){font-size:13px;line-height:1.5;color:#5d6e67;margin:13px 0 0}.pilot-config{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-content:start}.pilot-config button{min-height:108px;border:1px solid #d1ddd6;border-radius:10px;background:#fff;padding:13px;text-align:left;color:#586a63}.pilot-config button.active{border-color:#5f927d;background:#dfeee4;color:#274f42;box-shadow:inset 0 0 0 1px #5f927d}.pilot-config span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em}.pilot-config b{display:block;margin-top:17px;font-size:18px;letter-spacing:-.04em}.pilot-section{padding:72px 0;border-bottom:1px solid #d9dfdc}.pilot-section-head{display:flex;align-items:end;justify-content:space-between;gap:25px}.pilot-section-head>p{max-width:390px;margin:0;color:#687772;font-size:13px;line-height:1.45}.pilot-outcomes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:29px}.pilot-outcomes article{border:1px solid #d9dfdc;border-radius:12px;background:#fff;padding:19px;min-height:185px}.pilot-outcomes span{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#638478}.pilot-outcomes b{display:block;font-size:20px;line-height:1.08;letter-spacing:-.045em;margin:34px 0 12px}.pilot-outcomes small{display:block;color:#687773;font-size:11px;line-height:1.4}.pilot-rhythm{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:29px}.pilot-rhythm article{border-top:2px solid #6d9886;padding:14px 2px 0}.pilot-rhythm span{font-size:10px;color:#6b897e;letter-spacing:.1em}.pilot-rhythm b{display:block;font-size:20px;letter-spacing:-.04em;margin:20px 0 7px}.pilot-rhythm small{font-size:11px;color:#687772;line-height:1.35}.pilot-measure{display:grid;grid-template-columns:1.05fr .95fr;gap:45px;align-items:center;margin-top:29px;padding:29px 31px;border-radius:14px;background:#274f45;color:#fff}.pilot-measure .eyebrow{color:#b8d9cb;margin:0 0 8px}.pilot-measure h3{font-size:30px;line-height:1.02;letter-spacing:-.055em;margin:0}.pilot-measure p:not(.eyebrow){font-size:12px;line-height:1.48;color:#cde0d9;margin:13px 0 0}.pilot-measure-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.pilot-measure-grid div{border:1px solid #ffffff2e;border-radius:8px;background:#ffffff10;padding:13px}.pilot-measure-grid span{display:block;color:#bdd8ce;font-size:9px;letter-spacing:.08em;text-transform:uppercase}.pilot-measure-grid b{display:block;font-size:14px;line-height:1.18;margin-top:9px}.pilot-boundaries{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:29px}.pilot-boundaries article{border:1px solid #d9dfdc;border-radius:11px;background:#fff;padding:18px}.pilot-boundaries h3{font-size:18px;letter-spacing:-.04em;margin:18px 0 7px}.pilot-boundaries p{font-size:11px;line-height:1.45;color:#677771;margin:0}.pilot-details{margin-top:12px;border-top:1px solid #d9dfdc}.pilot-details details{border-bottom:1px solid #d9dfdc;padding:14px 0}.pilot-details summary{cursor:pointer;font-size:13px;font-weight:800;color:#294f43}.pilot-details p{max-width:690px;color:#64736e;font-size:12px;line-height:1.5;margin:9px 0 0}.pilot-contact{display:grid;grid-template-columns:.88fr 1.12fr;gap:54px;margin-top:72px;border-radius:15px;background:#f4ead1;padding:37px}.pilot-contact .eyebrow{margin:0 0 9px;color:#746343}.pilot-contact h2{font-size:clamp(31px,3.8vw,49px);line-height:1;letter-spacing:-.065em;margin:0}.pilot-contact p:not(.eyebrow){font-size:13px;line-height:1.48;color:#685f4d;margin:15px 0 0}.pilot-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}.pilot-form input,.pilot-form select{min-height:43px;border:1px solid #d6c89f;border-radius:7px;background:#fffdf7;color:#26322f;padding:0 11px;font-size:12px}.pilot-form select{grid-column:span 2}.pilot-form button{grid-column:span 2;min-height:44px;border:1px solid #305b4d;border-radius:7px;background:#305b4d;color:#fff;font-size:12px;font-weight:800}.pilot-confirm{grid-column:span 2;margin:4px 0 0;color:#4e6b5d;font-size:12px;font-weight:700}@media(max-width:780px){.pilot-reframed{padding:40px 20px 64px}.pilot-fact-row,.pilot-outcomes{grid-template-columns:repeat(2,1fr)}.pilot-brief,.pilot-measure,.pilot-contact{grid-template-columns:1fr;gap:28px}.pilot-section-head{align-items:flex-start;flex-direction:column}.pilot-rhythm{grid-template-columns:repeat(2,1fr)}.pilot-contact{padding:27px}.pilot-kicker{margin-bottom:22px}}@media(max-width:440px){.pilot-reframed{padding-inline:16px}.pilot-reframed h1{font-size:49px}.pilot-fact-row,.pilot-outcomes,.pilot-rhythm,.pilot-boundaries,.pilot-config,.pilot-measure-grid{grid-template-columns:1fr}.pilot-fact-row{gap:18px}.pilot-config button{min-height:78px}.pilot-config b{margin-top:8px}.pilot-form{grid-template-columns:1fr}.pilot-form input,.pilot-form select,.pilot-form button,.pilot-confirm{grid-column:span 1}.pilot-contact{padding:23px}.pilot-kicker{align-items:flex-start;flex-direction:column}}
+    .pilot-reframed{max-width:1180px;margin:auto;padding:56px 28px 84px}.pilot-kicker{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px}.pilot-kicker>span{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#668177}.pilot-reframed h1{max-width:760px;font-size:clamp(49px,6.2vw,82px);line-height:.9;letter-spacing:-.085em;margin:0}.pilot-lede-reframed{max-width:630px;margin:20px 0 27px;color:#66716e;font-size:17px;line-height:1.55}.pilot-hero-actions{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.pilot-hero-actions .text-link{color:#2e6552;font-size:12px;font-weight:800}.pilot-fact-row{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:48px}.pilot-fact-row article{border-top:2px solid #78a18e;padding:13px 3px 0}.pilot-fact-row span{display:block;color:#688177;font-size:10px;font-weight:800;letter-spacing:.1em}.pilot-fact-row b{display:block;margin:15px 0 5px;font-size:22px;letter-spacing:-.05em}.pilot-fact-row small{color:#697873;font-size:11px;line-height:1.35}.pilot-brief{display:grid;grid-template-columns:.85fr 1.15fr;gap:44px;margin-top:70px;padding:31px;background:#eef3ef;border-radius:16px}.pilot-brief .eyebrow{margin:0 0 10px}.pilot-brief h2,.pilot-section h2{font-size:clamp(30px,3.6vw,47px);line-height:1;letter-spacing:-.065em;margin:0}.pilot-brief p:not(.eyebrow){font-size:13px;line-height:1.5;color:#5d6e67;margin:13px 0 0}.pilot-scope-brief{display:grid;gap:4px;margin-top:21px;padding:12px 13px;border-left:3px solid #63917e;background:#fff;border-radius:0 8px 8px 0}.pilot-scope-brief span{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#668177}.pilot-scope-brief b{font-size:13px;color:#254f42}.pilot-scope-brief small{font-size:11px;line-height:1.4;color:#61726b}.pilot-config{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-content:start}.pilot-config button{min-height:108px;border:1px solid #d1ddd6;border-radius:10px;background:#fff;padding:13px;text-align:left;color:#586a63}.pilot-config button.active{border-color:#5f927d;background:#dfeee4;color:#274f42;box-shadow:inset 0 0 0 1px #5f927d}.pilot-config button:focus-visible{outline:3px solid #d4a849;outline-offset:2px}.pilot-config span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em}.pilot-config b{display:block;margin-top:17px;font-size:18px;letter-spacing:-.04em}.pilot-section{padding:72px 0;border-bottom:1px solid #d9dfdc}.pilot-section-head{display:flex;align-items:end;justify-content:space-between;gap:25px}.pilot-section-head>p{max-width:390px;margin:0;color:#687772;font-size:13px;line-height:1.45}.pilot-outcomes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:29px}.pilot-outcomes article{border:1px solid #d9dfdc;border-radius:12px;background:#fff;padding:19px;min-height:185px}.pilot-outcomes span{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#638478}.pilot-outcomes b{display:block;font-size:20px;line-height:1.08;letter-spacing:-.045em;margin:34px 0 12px}.pilot-outcomes small{display:block;color:#687773;font-size:11px;line-height:1.4}.pilot-rhythm{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:29px}.pilot-rhythm article{border-top:2px solid #6d9886;padding:14px 2px 0}.pilot-rhythm span{font-size:10px;color:#6b897e;letter-spacing:.1em}.pilot-rhythm b{display:block;font-size:20px;letter-spacing:-.04em;margin:20px 0 7px}.pilot-rhythm small{font-size:11px;color:#687772;line-height:1.35}.pilot-measure{display:grid;grid-template-columns:1.05fr .95fr;gap:45px;align-items:center;margin-top:29px;padding:29px 31px;border-radius:14px;background:#274f45;color:#fff}.pilot-measure .eyebrow{color:#b8d9cb;margin:0 0 8px}.pilot-measure h3{font-size:30px;line-height:1.02;letter-spacing:-.055em;margin:0}.pilot-measure p:not(.eyebrow){font-size:12px;line-height:1.48;color:#cde0d9;margin:13px 0 0}.pilot-measure-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.pilot-measure-grid div{border:1px solid #ffffff2e;border-radius:8px;background:#ffffff10;padding:13px}.pilot-measure-grid span{display:block;color:#bdd8ce;font-size:9px;letter-spacing:.08em;text-transform:uppercase}.pilot-measure-grid b{display:block;font-size:14px;line-height:1.18;margin-top:9px}.pilot-boundaries{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:29px}.pilot-boundaries article{border:1px solid #d9dfdc;border-radius:11px;background:#fff;padding:18px}.pilot-boundaries h3{font-size:18px;letter-spacing:-.04em;margin:18px 0 7px}.pilot-boundaries p{font-size:11px;line-height:1.45;color:#677771;margin:0}.pilot-details{margin-top:12px;border-top:1px solid #d9dfdc}.pilot-details details{border-bottom:1px solid #d9dfdc;padding:14px 0}.pilot-details summary{cursor:pointer;font-size:13px;font-weight:800;color:#294f43}.pilot-details p{max-width:690px;color:#64736e;font-size:12px;line-height:1.5;margin:9px 0 0}.pilot-contact{display:grid;grid-template-columns:.88fr 1.12fr;gap:54px;margin-top:72px;border-radius:15px;background:#f4ead1;padding:37px}.pilot-contact .eyebrow{margin:0 0 9px;color:#746343}.pilot-contact h2{font-size:clamp(31px,3.8vw,49px);line-height:1;letter-spacing:-.065em;margin:0}.pilot-contact p:not(.eyebrow){font-size:13px;line-height:1.48;color:#685f4d;margin:15px 0 0}.pilot-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}.pilot-form input,.pilot-form select{min-height:43px;border:1px solid #d6c89f;border-radius:7px;background:#fffdf7;color:#26322f;padding:0 11px;font-size:12px}.pilot-form select{grid-column:span 2}.pilot-form button{grid-column:span 2;min-height:44px;border:1px solid #305b4d;border-radius:7px;background:#305b4d;color:#fff;font-size:12px;font-weight:800}.pilot-confirm{grid-column:span 2;margin:4px 0 0;color:#4e6b5d;font-size:12px;font-weight:700}@media(max-width:780px){.pilot-reframed{padding:40px 20px 64px}.pilot-fact-row,.pilot-outcomes{grid-template-columns:repeat(2,1fr)}.pilot-brief,.pilot-measure,.pilot-contact{grid-template-columns:1fr;gap:28px}.pilot-section-head{align-items:flex-start;flex-direction:column}.pilot-rhythm{grid-template-columns:repeat(2,1fr)}.pilot-contact{padding:27px}.pilot-kicker{margin-bottom:22px}}@media(max-width:440px){.pilot-reframed{padding-inline:16px}.pilot-reframed h1{font-size:49px}.pilot-fact-row,.pilot-outcomes,.pilot-rhythm,.pilot-boundaries,.pilot-config,.pilot-measure-grid{grid-template-columns:1fr}.pilot-fact-row{gap:18px}.pilot-config button{min-height:78px}.pilot-config b{margin-top:8px}.pilot-form{grid-template-columns:1fr}.pilot-form input,.pilot-form select,.pilot-form button,.pilot-confirm{grid-column:span 1}.pilot-contact{padding:23px}.pilot-kicker{align-items:flex-start;flex-direction:column}}
   `}</style>
   );
 }
 
 export function PilotStory() {
-  const [scope, setScope] = useState("6–14 rooms");
+  const [scope, setScope] = useState<keyof typeof scopePlans>("9–14 rooms");
   const [sent, setSent] = useState(false);
+  const selectedPlan = scopePlans[scope];
 
   return (
     <SiteShell>
       <PilotStyles />
-    <section className="pilot-reframed">
+      <section className="pilot-reframed">
         <div className="pilot-kicker">
           <span>FitOS pilot</span>
           <Status tone="good">Evidence-led, not promise-led</Status>
@@ -93,17 +112,22 @@ export function PilotStory() {
               Start with the rooms where the team can act on the evidence within
               the same shift.
             </p>
+            <div className="pilot-scope-brief" aria-live="polite">
+              <span>Selected pilot brief</span>
+              <b>
+                {scope} · {selectedPlan.duration}
+              </b>
+              <small>
+                {selectedPlan.cover}. {selectedPlan.readout}
+              </small>
+            </div>
           </div>
           <div className="pilot-config" aria-label="Pilot room scope">
             {["6–8 rooms", "9–14 rooms", "14+ rooms"].map((item) => (
               <button
-                className={
-                  scope === item ||
-                  (scope === "6–14 rooms" && item === "9–14 rooms")
-                    ? "active"
-                    : ""
-                }
-                onClick={() => setScope(item)}
+                aria-pressed={scope === item}
+                className={scope === item ? "active" : ""}
+                onClick={() => setScope(item as keyof typeof scopePlans)}
                 key={item}
               >
                 <span>Scope</span>
@@ -260,13 +284,16 @@ export function PilotStory() {
               placeholder="Retailer or brand"
               required
             />
-            <select aria-label="Rooms in scope" defaultValue="">
-              <option value="" disabled>
-                Rooms in scope
-              </option>
+            <select
+              aria-label="Rooms in scope"
+              value={scope}
+              onChange={(event) =>
+                setScope(event.target.value as keyof typeof scopePlans)
+              }
+            >
               <option>6–8 rooms</option>
               <option>9–14 rooms</option>
-              <option>More than 14 rooms</option>
+              <option>14+ rooms</option>
             </select>
             <button type="submit">Request a pilot discussion</button>
             {sent && (
@@ -276,7 +303,7 @@ export function PilotStory() {
             )}
           </form>
         </section>
-    </section>
+      </section>
     </SiteShell>
   );
 }
