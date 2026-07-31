@@ -1,45 +1,47 @@
-# Guided demo design QA
+# Customer journey design QA
 
-## Evidence
+**Comparison target**
 
-- Source visual truth: `/var/folders/qm/nlhwbcsj113_khmg044bkzdh0000gn/T/codex-clipboard-a95252ea-2c0b-4efb-88f9-926d34d69c1a.png`
+- Source visual truth: `/var/folders/qm/nlhwbcsj113_khmg044bkzdh0000gn/T/codex-clipboard-71a35d09-e80b-44fe-af6c-39ac7253316b.png`
 - Implementation capture: `design-qa-implementation.png`
-- Combined comparison: `design-qa-comparison.png`
-- Source pixels: 2540 × 1540. It was normalized to 1280px wide for the combined comparison.
-- Implementation pixels / CSS viewport / density: 1280 × 720 / 1280 × 720 / 1×.
-- State: `/demo`, Quiet Store, Customer step, desktop light theme.
-- Primary interactions checked: all four scenario selectors; Next step through Associate and Manager; corresponding role links present.
+- Full-view comparison: `design-qa-comparison.png`
+- State: Customer journey, **Scan a garment label** (step 2 of 9); Busy Saturday scenario.
+- Viewport: 1280 px wide browser capture. The source was 2720 × 2100 px and normalized to 1280 × 988 px for comparison; the rendered full-page implementation is 1280 × 1119 px. The source is a high-density capture; the implementation is captured at 1×.
+- Focused region: the phone scan label, barcode, recognition action and manual-entry control. A focused crop was not needed because these controls are legible in the full-view comparison.
 
-## Comparison history
+**Findings**
 
-### Pass 1
+- [Resolved P1] Scan controls ran behind the fixed phone footer in the first rendered pass.
+  - Evidence: the first post-build capture showed the manual-entry row partially obscured by the footer.
+  - Fix: reduced the scan-label panel, barcode and form spacing in `.customer-reframed` while preserving the fixed device height.
+  - Post-fix evidence: `design-qa-implementation.png` shows the barcode, recognition action, product-code input and “Use code” control all fully visible above the footer.
 
-The source capture shows the pre-change scenario stage. The implementation intentionally adds a fixed-height stage and an evidence-led ROI lens, so the initial viewport starts higher in the page and the stage's lower content sits below the first 720px capture. This is intentional product scope rather than a fidelity mismatch.
+- No remaining P0, P1 or P2 differences. The redesigned composition intentionally replaces the source’s oversized editorial headline with a shorter outcome-led message, visible three-part explanation and fixed-height interaction frame.
 
-The fixed stage did not change size while moving from Stock Discrepancy / Associate to Stock Discrepancy / Manager. Scenario cards retain their fixed desktop height, and the action row remains in the same position.
+**Required fidelity surfaces**
 
-## Required fidelity surfaces
+- **Fonts and typography:** retained the product’s sans-serif display/body system, with a smaller, scannable supporting hierarchy in the phone.
+- **Spacing and layout rhythm:** the new two-column frame keeps consistent side margins, gives the phone a stable height, and prevents action controls from moving or clipping between steps.
+- **Colors and tokens:** preserved the existing warm off-white, deep green, mint status and muted-gray system; the primary action remains high contrast.
+- **Image quality and asset fidelity:** the previous hand-built vertical barcode has been replaced by a browser-rendered, machine-generated Code 128 barcode via `jsbarcode`. No placeholder imagery, CSS barcode art or handcrafted SVG is used in the scan label.
+- **Copy and content:** copy now explains the value exchange—recognise an existing label, recommend available options and give the team a room-aware request—before the user starts.
 
-- **Fonts and typography:** The display hierarchy, dense UI labels, dark ink, all-caps eyebrow treatment, and compact action labels remain consistent with the source. The added proof cells use the existing small-label rhythm; no wrapping or truncation was visible in the tested desktop states.
-- **Spacing and layout rhythm:** Scenario cards remain an even four-column row. The walkthrough is a fixed 508px desktop frame, with a fixed 472px content card and anchored actions. This removes the content-height shifts that previously moved the action row.
-- **Colors and tokens:** The existing paper, deep green, mint status and fine grey-rule palette is retained. Added ROI evidence blocks use the existing green/muted token family and preserve contrast.
-- **Image quality and asset fidelity:** The selected surface contains no photographic or decorative image asset. No image asset was substituted, generated, cropped or degraded.
-- **Copy and content:** The generic signal callout was replaced with explicit `How it works`, `Value to validate` and `Measure in pilot` statements. The ROI lens explicitly says that ROI is not promised and names the retailer-verifiable measures instead.
+**Interaction and runtime checks**
 
-## Findings
+- Published route opened successfully: `https://fitos-retail-operations.vercel.app/demo/customer`
+- Tested `Start with a garment` → Scan state; barcode has the accessible name `Barcode 5061048301128`.
+- Tested `Recognise demonstration label` → Room-selection state (step 3 of 9).
+- Browser console errors and warnings: none.
 
-No actionable P0, P1 or P2 findings remain in the tested desktop flow.
+**Implementation checklist**
 
-### Follow-up polish
+- [x] Replace fake barcode with a real Code 128 barcode.
+- [x] Reframe the customer page around a stable, understandable walkthrough.
+- [x] Keep the scan action and manual code entry inside the phone frame.
+- [x] Verify the published interaction path and browser console.
 
-- [P3] Capture a dedicated 1440px presentation-mode screenshot if the demo will be shown on a large boardroom display; the current responsive stage is already stable at 1280px.
+**Follow-up polish**
 
-## Implementation checklist
-
-- [x] Lock scenario card and walkthrough frame heights on desktop.
-- [x] Keep primary actions in a fixed action row.
-- [x] Add per-step mechanism, value and pilot-measure explanation.
-- [x] Add a transparent ROI lens tied to observed pilot measures.
-- [x] Verify scenario and step interactions.
+- [P3] Consider adding real product photography to the later recommendation cards as the product catalogue expands.
 
 final result: passed
