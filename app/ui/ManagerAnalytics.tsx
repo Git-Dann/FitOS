@@ -1,10 +1,255 @@
 "use client";
+
 import { useState } from "react";
 import { SiteShell, Status } from "./FitOSApp";
 import { useScenario } from "./scenario-context";
 import { useOperations } from "./operations-context";
 
-const metrics=[['Sessions','126','Observed'],['Requests','84','Observed'],['Fulfilment rate','78%','Observed'],['Within-promise','71%','Observed'],['Requests / staff hour','5.6','Observed'],['Median wait','4m 12s','Observed'],['Recommendation requests','39','Observed'],['Alternative acceptance','41%','Observed'],['Stock not found','6','Observed'],['Estimated missed demand','£1,140','Modelled']];
-const ledger=[['Pleated Chino','32 · Charcoal','7','Stock check'],['Field Jacket','M · Stone','5','Nearby-store route'],['Textured Overshirt','L · Olive','4','Floor placement review']];
-function Styles(){return <style>{`.manager-analytics{max-width:1280px;margin:auto;padding:60px 28px 78px}.manager-head{display:grid;grid-template-columns:1fr auto;gap:25px;align-items:end}.manager-head h1{font-size:clamp(43px,5vw,68px);line-height:.95;letter-spacing:-.075em;margin:0 0 16px}.manager-head p:not(.eyebrow){font-size:15px;line-height:1.55;color:#66716e;max-width:650px}.manager-filters{display:flex;gap:7px;flex-wrap:wrap;margin:28px 0 18px}.manager-filters button{border:1px solid #d9dfdc;background:white;border-radius:999px;padding:7px 10px;font-size:11px;color:#536761}.manager-filters button.active{background:#284e46;color:white;border-color:#284e46}.manager-metric-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.manager-metric-grid article{border:1px solid #d9dfdc;border-radius:8px;background:#fff;padding:14px}.manager-metric-grid span{font-size:10px;color:#66716e}.manager-metric-grid b{display:block;font-size:25px;letter-spacing:-.05em;margin:10px 0}.manager-metric-grid small{font-size:9px;color:#668279;text-transform:uppercase;letter-spacing:.06em}.analytics-section{margin-top:20px;border:1px solid #d9dfdc;background:#fff;border-radius:10px;padding:20px}.analytics-section h2{font-size:24px;letter-spacing:-.05em;margin:0}.analytics-section .section-heading{margin-bottom:14px}.analytics-two{display:grid;grid-template-columns:1fr 1fr;gap:17px}.chart-block{background:#f3f5f2;border-radius:8px;padding:15px}.chart-block h3{font-size:14px;margin:0 0 13px}.hour-bars{height:130px;display:flex;gap:7px;align-items:end;border-bottom:1px solid #ccd6d0;padding-bottom:18px}.hour-bars div{flex:1;background:#a8c9bc;border-radius:3px 3px 0 0;position:relative}.hour-bars div:nth-child(5),.hour-bars div:nth-child(6){background:#d2a44b}.hour-bars span{position:absolute;bottom:-17px;left:50%;transform:translateX(-50%);font-size:8px;color:#66716e}.wait-lines{display:grid;gap:12px}.wait-lines div{display:grid;grid-template-columns:55px 1fr 36px;gap:8px;align-items:center;font-size:10px}.wait-lines i{height:7px;background:#d8e4de;border-radius:9px;overflow:hidden}.wait-lines i b{display:block;height:100%;background:#60927e}.wait-lines em{font-style:normal;color:#62726d}.method-mix{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.method-mix article{background:#eef3ef;padding:12px;border-radius:7px}.method-mix b{font-size:20px}.method-mix span{display:block;font-size:10px;line-height:1.3;color:#66716e;margin-top:4px}.heatmap{display:grid;grid-template-columns:75px repeat(7,1fr);gap:4px;align-items:center}.heatmap span{font-size:9px;color:#66716e}.heatmap i{height:23px;background:#e6eee9;border-radius:3px}.heatmap i.hot{background:#6e9c88}.heatmap i.warm{background:#bed9cc}.inventory-list,.ledger{display:grid;gap:0}.inventory-list article,.ledger article{display:grid;grid-template-columns:1fr auto;gap:8px;border-top:1px solid #d9dfdc;padding:11px 0}.inventory-list b,.ledger b{font-size:12px}.inventory-list span,.ledger span{font-size:10px;color:#66716e}.ledger button{border:0;background:none;color:#305f50;font-size:10px;font-weight:700}.roi-model{display:grid;grid-template-columns:1fr 1fr;gap:17px;background:#284e46;color:white;border-radius:9px;padding:20px}.roi-model h3{font-size:21px;letter-spacing:-.05em;margin:8px 0}.roi-model p{font-size:12px;line-height:1.5;color:#c8ded6}.roi-model .model-numbers{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;align-content:start}.model-numbers div{background:#ffffff16;border-radius:6px;padding:11px}.model-numbers span{font-size:9px;color:#b9d5ca}.model-numbers b{display:block;font-size:22px;margin-top:5px}.drawer{position:fixed;right:18px;bottom:18px;width:min(390px,calc(100vw - 36px));background:#fff;border:1px solid #d9dfdc;border-radius:12px;box-shadow:0 20px 50px #19372c2b;padding:19px;z-index:20}.drawer h3{font-size:21px;letter-spacing:-.05em;margin:6px 0}.drawer p{font-size:12px;color:#66716e;line-height:1.5}.drawer button{border:0;background:none;color:#285e4e;font-size:11px;font-weight:700;padding:0}.shared-signal{padding:11px;background:#edf3ee;border-radius:7px;font-size:11px;color:#49675b;margin:14px 0}@media(max-width:850px){.manager-metric-grid{grid-template-columns:repeat(3,1fr)}.analytics-two,.roi-model{grid-template-columns:1fr}.manager-head{grid-template-columns:1fr}}@media(max-width:550px){.manager-analytics{padding:40px 0}.manager-metric-grid{grid-template-columns:1fr 1fr}.method-mix{grid-template-columns:1fr 1fr}.heatmap{grid-template-columns:55px repeat(7,1fr)}.analytics-section{padding:14px}}`}</style>}
-export function ManagerAnalytics(){const {scenario}=useScenario();const {lastUpdate}=useOperations();const [filter,setFilter]=useState('Today');const [drawer,setDrawer]=useState<string|null>(null);const bars=[35,54,42,68,88,79,57];return <SiteShell><Styles/><section className="manager-analytics"><div className="manager-head"><div><p className="eyebrow">Manager analytics · Floor 1</p><h1>See the signals behind fitting-room demand.</h1><p>Use observed service activity, stock exceptions and recommendation behaviour to guide the next floor decision. Figures are local prototype data, not performance claims.</p></div><Status tone={scenario==='Stock Discrepancy'?'warn':'good'}>{scenario}</Status></div><div className="shared-signal"><b>Latest operational update: </b>{lastUpdate}</div><div className="manager-filters">{['Today','Last 7 days','Floor 1','All rooms','Busy periods'].map(item=><button className={filter===item?'active':''} onClick={()=>setFilter(item)} key={item}>{item}</button>)}</div><div className="manager-metric-grid">{metrics.map(([label,value,kind])=><article key={label}><span>{label}</span><b>{value}</b><small>{kind}</small></article>)}</div><section className="analytics-section"><div className="section-heading"><div><p className="eyebrow">1 · Customer intent</p><h2>Requests and capacity by hour</h2></div><Status>Observed</Status></div><div className="analytics-two"><div className="chart-block"><h3>Requests entering the queue</h3><div className="hour-bars">{bars.map((h,i)=><div style={{height:`${h}%`}} key={i}><span>{10+i}</span></div>)}</div></div><div className="chart-block"><h3>Recommendation behaviour</h3><div className="method-mix"><article><b>39</b><span>Recommendation requests</span></article><article><b>41%</b><span>Alternative acceptance</span></article><article><b>18</b><span>Companion collections</span></article><article><b>9</b><span>High-try, low-keep signals</span></article></div></div></div></section><section className="analytics-section"><div className="section-heading"><div><p className="eyebrow">2 · Operational performance</p><h2>Promises, actual waits and route efficiency</h2></div><Status tone="good">Observed</Status></div><div className="analytics-two"><div className="chart-block"><h3>Promised versus actual wait</h3><div className="wait-lines">{[['Room delivery',62,'4m'],['Batch pick',81,'8m'],['Checkout collection',44,'6m'],['Companion collection',34,'2m']].map(([n,w,t])=><div key={String(n)}><span>{n}</span><i><b style={{width:`${w}%`}}/></i><em>{t}</em></div>)}</div></div><div className="chart-block"><h3>Trips and batch efficiency</h3><div className="method-mix"><article><b>31</b><span>Pick trips</span></article><article><b>8</b><span>Batch routes</span></article><article><b>2.6</b><span>Requests / batch</span></article><article><b>71%</b><span>Within-promise</span></article></div></div></div></section><section className="analytics-section"><div className="section-heading"><div><p className="eyebrow">3 · Inventory & merchandising</p><h2>Where demand could not be met cleanly</h2></div><Status tone="warn">Action recommended</Status></div><div className="analytics-two"><div className="chart-block"><h3>Accessible demand heatmap</h3><div className="heatmap" role="img" aria-label="Heatmap of fitting room requests by day and hour; darker cells show more requests"><span></span>{['10','11','12','13','14','15','16'].map(x=><span key={x}>{x}</span>)}{['Mon','Tue','Wed','Thu','Fri'].map((day,row)=><><span key={day}>{day}</span>{bars.map((_,col)=><i className={(row===3&&col>3)||(row===4&&col===5)?'hot':col>3?'warm':''} aria-label={`${day} ${10+col}: ${row+col+2} requests`} key={`${day}${col}`}/>)}</>)}</div></div><div className="inventory-list"><article><div><b>Most requested unavailable size</b><span>32 · Charcoal · 7 requests</span></div><button className="text-button" onClick={()=>setDrawer('Chino size 32')}>Drill down →</button></article><article><div><b>Stock discrepancies</b><span>6 items shown available but not located</span></div><button className="text-button" onClick={()=>setDrawer('Stock discrepancies')}>Drill down →</button></article><article><div><b>High-try, low-keep</b><span>Field Jacket · Stone</span></div><button className="text-button" onClick={()=>setDrawer('Field Jacket')}>Drill down →</button></article></div></div></section><section className="analytics-section"><div className="section-heading"><div><p className="eyebrow">4 · Strategic planning</p><h2>Missed demand and a transparent planning model</h2></div><Status>Modelled estimate</Status></div><div className="ledger">{ledger.map(([product,variant,count,action])=><article key={product}><div><b>{product}</b><span>{variant} · {count} recorded requests</span></div><button onClick={()=>setDrawer(`${product} · ${action}`)}>{action} →</button></article>)}</div><div className="roi-model"><div><p className="eyebrow">Caveated planning model</p><h3>Estimated missed demand: £1,140</h3><p>This model combines recorded unavailable requests with product prices. It is directional only: it is not revenue, conversion, savings or ROI, and it should be validated with retailer data.</p></div><div className="model-numbers"><div><span>Recorded unavailable requests</span><b>16</b></div><div><span>Average listed price</span><b>£71</b></div><div><span>Recommended next action</span><b>Check 32 / Charcoal</b></div><div><span>Evidence type</span><b>Observed + modelled</b></div></div></div></section>{drawer&&<aside className="drawer"><p className="eyebrow">Drill-down</p><h3>{drawer}</h3><p>Review the request history, stock confidence and fulfilment outcomes before changing inventory, placement or staffing. This prototype uses deterministic local data.</p><button onClick={()=>setDrawer(null)}>Close drawer</button></aside>}</section></SiteShell>}
+const queueBars = [35, 54, 42, 68, 88, 79, 57];
+const hours = ["10", "11", "12", "13", "14", "15", "16"];
+
+const signals = [
+  {
+    id: "Chino size 32",
+    title: "Restock size 32 / Charcoal",
+    detail: "7 requests could not be completed",
+    tone: "warn" as const,
+    action: "View demand",
+  },
+  {
+    id: "Stock discrepancies",
+    title: "Resolve stock accuracy",
+    detail: "6 items shown as available were not found",
+    tone: "neutral" as const,
+    action: "Review list",
+  },
+  {
+    id: "Field Jacket",
+    title: "Review Field Jacket / Stone",
+    detail: "High try rate, lower keep rate",
+    tone: "neutral" as const,
+    action: "Inspect item",
+  },
+];
+
+function ManagerStyles() {
+  return (
+    <style>{`
+    .manager-reframe{max-width:1180px;margin:auto;padding:54px 28px 86px}.manager-topline{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:20px}.manager-topline>span{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#678278}.manager-reframe h1{font-size:clamp(45px,5.8vw,74px);line-height:.92;letter-spacing:-.08em;margin:0;max-width:690px}.manager-subhead{margin:18px 0 0;max-width:590px;color:#66716e;font-size:16px;line-height:1.5}.manager-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:32px 0 17px}.manager-periods{display:flex;gap:6px}.manager-periods button{border:1px solid #d6ded9;background:#fff;color:#5b6d66;border-radius:999px;padding:8px 13px;font-size:11px;font-weight:700}.manager-periods button.active{background:#294f46;border-color:#294f46;color:#fff}.manager-updated{font-size:11px;color:#71807b}.manager-action{display:grid;grid-template-columns:1.16fr .84fr;gap:28px;align-items:center;background:#254f45;color:#fff;border-radius:16px;padding:29px 31px}.manager-action .eyebrow{color:#b7d9cb;margin:0 0 10px}.manager-action h2{font-size:clamp(29px,3.5vw,43px);line-height:.98;letter-spacing:-.06em;margin:0}.manager-action p:not(.eyebrow){color:#d4e4de;font-size:13px;line-height:1.48;max-width:470px;margin:12px 0 0}.manager-action .button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 14px;margin-top:18px;border:1px solid #cfe7dc;border-radius:8px;background:#fff;color:#275747;font-size:12px;font-weight:800}.manager-action-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.manager-action-stats div{min-height:104px;border:1px solid #ffffff30;border-radius:10px;background:#ffffff10;padding:14px}.manager-action-stats b{display:block;font-size:28px;letter-spacing:-.06em}.manager-action-stats span{display:block;color:#c8ddd5;font-size:10px;line-height:1.35;margin-top:10px}.manager-decision-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:17px}.manager-card{border:1px solid #d9dfdc;border-radius:13px;background:#fff;padding:22px}.manager-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.manager-card .eyebrow{margin:0;color:#6f8980}.manager-card h2{font-size:25px;line-height:1;letter-spacing:-.055em;margin:7px 0 0}.manager-card>p{color:#65736e;font-size:12px;line-height:1.45;margin:10px 0 0}.manager-card .status{font-size:10px;white-space:nowrap}.manager-bar-chart{height:136px;display:flex;gap:8px;align-items:end;border-bottom:1px solid #d6dfda;padding:18px 0 18px;margin-top:19px}.manager-bar{display:flex;flex:1;height:100%;align-items:end;position:relative}.manager-bar i{display:block;width:100%;border-radius:4px 4px 0 0;background:#b8d6cb}.manager-bar.peak i{background:#d4a849}.manager-bar span{position:absolute;left:50%;bottom:-18px;transform:translateX(-50%);color:#697973;font-size:9px}.manager-card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:23px;color:#536a63;font-size:11px}.manager-card-foot b{color:#244f41;font-size:12px}.manager-delivery{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:end;margin-top:30px}.manager-delivery strong{font-size:58px;line-height:.8;letter-spacing:-.09em}.manager-delivery strong span{font-size:22px;letter-spacing:-.05em}.manager-delivery p{font-size:11px;color:#63746e;margin:10px 0 0}.manager-ring{width:96px;height:96px;border-radius:50%;background:conic-gradient(#60927e 0 71%,#e5ece8 71% 100%);display:grid;place-items:center}.manager-ring span{display:grid;place-items:center;width:72px;height:72px;border-radius:50%;background:#fff;color:#315d4f;font-size:12px;font-weight:800}.manager-signal-panel{margin-top:17px;border:1px solid #d9dfdc;border-radius:13px;background:#fff;padding:23px}.manager-signal-heading{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:6px}.manager-signal-heading h2{font-size:28px;letter-spacing:-.06em;margin:0}.manager-signal-heading p{font-size:11px;color:#687872;margin:0}.manager-signal-list{display:grid}.manager-signal-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;border-top:1px solid #dfe5e1;padding:16px 0}.manager-signal-dot{width:9px;height:9px;border-radius:50%;background:#6b9987}.manager-signal-dot.warn{background:#d4a849}.manager-signal-row b{display:block;font-size:13px}.manager-signal-row span{display:block;font-size:11px;color:#6a7973;margin-top:4px}.manager-signal-row button{border:0;background:none;color:#2d6452;font-size:11px;font-weight:800;padding:5px 0}.manager-evidence{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:17px}.manager-evidence article{border-radius:12px;padding:19px;background:#f0f3ef}.manager-evidence .eyebrow{margin:0;color:#6a857b}.manager-evidence b{display:block;font-size:32px;letter-spacing:-.07em;margin:14px 0 6px}.manager-evidence p{font-size:11px;line-height:1.45;color:#64736e;margin:0}.manager-drawer{position:fixed;right:22px;bottom:22px;z-index:30;width:min(370px,calc(100vw - 44px));border:1px solid #d6ded9;border-radius:14px;background:#fff;padding:20px;box-shadow:0 20px 50px #19372c2b}.manager-drawer h3{font-size:23px;letter-spacing:-.055em;margin:7px 0}.manager-drawer p:not(.eyebrow){color:#66716e;font-size:12px;line-height:1.5}.manager-drawer button{border:0;background:none;color:#285e4e;font-size:11px;font-weight:800;padding:0}@media(max-width:760px){.manager-reframe{padding:38px 18px 64px}.manager-action,.manager-decision-grid,.manager-evidence{grid-template-columns:1fr}.manager-action-stats{grid-template-columns:repeat(3,1fr)}.manager-signal-heading{align-items:flex-start;flex-direction:column}.manager-controls{align-items:flex-start;flex-direction:column;margin-top:24px}.manager-signal-row{grid-template-columns:auto 1fr}.manager-signal-row button{grid-column:2;justify-self:start}.manager-subhead{font-size:14px}.manager-action{padding:24px}.manager-card{padding:18px}}@media(max-width:420px){.manager-reframe h1{font-size:46px}.manager-action-stats{gap:6px}.manager-action-stats div{padding:10px;min-height:90px}.manager-action-stats b{font-size:23px}.manager-action-stats span{font-size:9px}.manager-periods button{padding-inline:10px}.manager-topline{align-items:flex-start;flex-direction:column}.manager-delivery strong{font-size:52px}}
+  `}</style>
+  );
+}
+
+export function ManagerAnalytics() {
+  const { scenario } = useScenario();
+  const { lastUpdate } = useOperations();
+  const [period, setPeriod] = useState("Today");
+  const [drawer, setDrawer] = useState<string | null>(null);
+
+  return (
+    <SiteShell>
+      <ManagerStyles />
+      <main className="manager-reframe">
+        <div className="manager-topline">
+          <span>Manager view · Floor 1</span>
+          <Status tone={scenario === "Stock Discrepancy" ? "warn" : "good"}>
+            {scenario}
+          </Status>
+        </div>
+        <h1>Catch the next missed sale.</h1>
+        <p className="manager-subhead">
+          A decision view for service pressure, unavailable demand and the next
+          practical action.
+        </p>
+        <div className="manager-controls">
+          <div className="manager-periods">
+            {["Today", "Last 7 days"].map((item) => (
+              <button
+                className={period === item ? "active" : ""}
+                key={item}
+                onClick={() => setPeriod(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <span className="manager-updated">Latest update · {lastUpdate}</span>
+        </div>
+
+        <section
+          className="manager-action"
+          aria-labelledby="manager-action-title"
+        >
+          <div>
+            <p className="eyebrow">Priority action</p>
+            <h2 id="manager-action-title">
+              Check size 32 / Charcoal before the next peak.
+            </h2>
+            <p>
+              Seven requests could not be completed. This is the clearest place
+              to protect demand today.
+            </p>
+            <button
+              className="button"
+              onClick={() => setDrawer("Size 32 / Charcoal demand")}
+            >
+              View the evidence
+            </button>
+          </div>
+          <div className="manager-action-stats">
+            <div>
+              <b>7</b>
+              <span>unmet requests</span>
+            </div>
+            <div>
+              <b>14–15</b>
+              <span>peak hours</span>
+            </div>
+            <div>
+              <b>£1.1k</b>
+              <span>indicative demand</span>
+            </div>
+          </div>
+        </section>
+
+        <section
+          className="manager-decision-grid"
+          aria-label="Live operating picture"
+        >
+          <article className="manager-card">
+            <div className="manager-card-head">
+              <div>
+                <p className="eyebrow">Queue pressure</p>
+                <h2>Busy window ahead</h2>
+              </div>
+              <Status tone="warn">14:00–15:00</Status>
+            </div>
+            <p>
+              Requests rise fastest in the afternoon. Put a colleague close to
+              fitting rooms before the peak.
+            </p>
+            <div
+              className="manager-bar-chart"
+              role="img"
+              aria-label="Requests increase most at 14:00 and 15:00"
+            >
+              {queueBars.map((height, index) => (
+                <div
+                  className={
+                    index === 4 || index === 5
+                      ? "manager-bar peak"
+                      : "manager-bar"
+                  }
+                  key={hours[index]}
+                >
+                  <i style={{ height: `${height}%` }} />
+                  <span>{hours[index]}</span>
+                </div>
+              ))}
+            </div>
+            <div className="manager-card-foot">
+              <span>84 requests today</span>
+              <b>Plan one extra hand-off</b>
+            </div>
+          </article>
+          <article className="manager-card">
+            <div className="manager-card-head">
+              <div>
+                <p className="eyebrow">Delivery health</p>
+                <h2>Service is holding</h2>
+              </div>
+              <Status tone="good">Observed</Status>
+            </div>
+            <p>
+              Most fitting-room requests are reaching the customer within the
+              promise.
+            </p>
+            <div className="manager-delivery">
+              <div>
+                <strong>
+                  71<span>%</span>
+                </strong>
+                <p>
+                  within the promised window
+                  <br />
+                  Median wait: 4m 12s
+                </p>
+              </div>
+              <div
+                className="manager-ring"
+                aria-label="71 percent within promise"
+              >
+                <span>71%</span>
+              </div>
+            </div>
+            <div className="manager-card-foot">
+              <span>31 pick trips</span>
+              <b>8 batched routes</b>
+            </div>
+          </article>
+        </section>
+
+        <section
+          className="manager-signal-panel"
+          aria-labelledby="manager-signals-title"
+        >
+          <div className="manager-signal-heading">
+            <div>
+              <p className="eyebrow">Review next</p>
+              <h2 id="manager-signals-title">Three signals worth acting on.</h2>
+            </div>
+            <p>Observed data, not a performance claim.</p>
+          </div>
+          <div className="manager-signal-list">
+            {signals.map((signal) => (
+              <article className="manager-signal-row" key={signal.id}>
+                <i
+                  className={`manager-signal-dot ${signal.tone === "warn" ? "warn" : ""}`}
+                />
+                <div>
+                  <b>{signal.title}</b>
+                  <span>{signal.detail}</span>
+                </div>
+                <button onClick={() => setDrawer(signal.id)}>
+                  {signal.action} →
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="manager-evidence" aria-label="Supporting evidence">
+          <article>
+            <p className="eyebrow">Customer response</p>
+            <b>41%</b>
+            <p>
+              of relevant alternatives were accepted, suggesting recommendations
+              can recover part of an unavailable request.
+            </p>
+          </article>
+          <article>
+            <p className="eyebrow">Planning signal</p>
+            <b>16</b>
+            <p>
+              recorded unavailable requests contribute to an indicative £1.1k
+              demand view. Validate with retailer data before actioning spend.
+            </p>
+          </article>
+        </section>
+
+        {drawer && (
+          <aside className="manager-drawer">
+            <p className="eyebrow">Evidence</p>
+            <h3>{drawer}</h3>
+            <p>
+              Review request history, stock confidence and fulfilment outcomes
+              before changing stock, placement or staffing. This demonstration
+              uses deterministic local data.
+            </p>
+            <button onClick={() => setDrawer(null)}>Close</button>
+          </aside>
+        )}
+      </main>
+    </SiteShell>
+  );
+}
