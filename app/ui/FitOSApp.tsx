@@ -10,13 +10,28 @@ const money = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP
 
 export function Header() {
   const path = usePathname();
-  const links = [{ href: "/platform", label: "Platform" }, { href: "/demo", label: "Demo" }, { href: "/demo/customer", label: "Customer" }, { href: "/demo/associate", label: "Associate" }, { href: "/demo/manager", label: "Manager" }, { href: "/pilot", label: "Pilot" }];
+  const links = [{ href: "/platform", label: "Platform" }, { href: "/demo", label: "Guided demo" }, { href: "/demo/customer", label: "Customer" }, { href: "/demo/associate", label: "Associate" }, { href: "/demo/manager", label: "Manager" }, { href: "/pilot", label: "Pilot plan" }];
 
-  return <header className="site-header"><Link className="brand" href="/"><span className="brand-mark">F</span><span>FitOS</span></Link><nav>{links.map(link => <Link className={path === link.href ? "active" : ""} href={link.href} key={link.href}>{link.label}</Link>)}</nav></header>;
+  return <header className="site-header"><Link className="brand" href="/"><span className="brand-mark">F</span><span>FitOS</span></Link><nav aria-label="Primary navigation">{links.map(link => <Link className={path === link.href ? "active" : ""} href={link.href} key={link.href}>{link.label}</Link>)}</nav></header>;
 }
 
 function Footer() { return <footer><span>FitOS prototype · retail operations, not a customer-facing shop</span><span>Local demonstration data</span></footer>; }
-export function SiteShell({ children }: { children: React.ReactNode }) { return <><Header /><main>{children}</main><Footer /></>; }
+const journey = [
+  { href: "/demo/customer", label: "Customer", detail: "Find and request" },
+  { href: "/demo/associate", label: "Associate", detail: "Fulfil and reset" },
+  { href: "/demo/manager", label: "Manager", detail: "Learn and decide" },
+];
+
+function JourneyContext() {
+  const path = usePathname();
+  if (path === "/pilot") return <aside className="journey-context" aria-label="Pilot planning journey"><div><span className="eyebrow">Pilot planning</span><strong>Evidence-led rollout decision</strong></div><ol><li className="complete"><Link href="/demo/customer"><span>01</span><b>Observe</b><small>See the customer request</small></Link></li><li className="complete"><Link href="/demo/associate"><span>02</span><b>Operate</b><small>Test the floor workflow</small></Link></li><li className="complete"><Link href="/demo/manager"><span>03</span><b>Measure</b><small>Review the signals</small></Link></li></ol><Link className="journey-next" href="/demo">Return to guided demo <span>→</span></Link></aside>;
+  const activeIndex = journey.findIndex(item => item.href === path);
+  if (activeIndex < 0) return null;
+  const next = journey[activeIndex + 1];
+  return <aside className="journey-context" aria-label="Live demo journey"><div><span className="eyebrow">Live demo journey</span><strong>Step {activeIndex + 1} of {journey.length}</strong></div><ol>{journey.map((item, index) => <li className={index === activeIndex ? "current" : index < activeIndex ? "complete" : ""} key={item.href}><Link href={item.href}><span>{String(index + 1).padStart(2, "0")}</span><b>{item.label}</b><small>{item.detail}</small></Link></li>)}</ol>{next ? <Link className="journey-next" href={next.href}>Continue to {next.label} <span>→</span></Link> : <Link className="journey-next" href="/pilot">Turn this into a pilot plan <span>→</span></Link>}</aside>;
+}
+
+export function SiteShell({ children }: { children: React.ReactNode }) { return <><Header /><JourneyContext /><main>{children}</main><Footer /></>; }
 const Shell = SiteShell;
 export function Status({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "good" | "warn" | "dark" }) { return <span className={`status ${tone}`}><i />{children}</span>; }
 export function Metric({ label, value, detail, trend }: { label: string; value: string; detail: string; trend?: string }) { return <article className="metric"><p>{label}</p><strong>{value}</strong><div><span>{detail}</span>{trend && <em>{trend}</em>}</div></article>; }

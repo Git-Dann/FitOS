@@ -7,10 +7,9 @@ type ScenarioState = { scenario: Scenario; setScenario: (scenario: Scenario) => 
 const Context = createContext<ScenarioState | null>(null);
 
 export function ScenarioProvider({ children }: { children: React.ReactNode }) {
-  const [scenario, setScenarioState] = useState<Scenario>(() => {
-    if (typeof window === "undefined") return "Busy Saturday";
-    return (localStorage.getItem("fitos-scenario") as Scenario | null) ?? "Busy Saturday";
-  });
+  // Keep the first client render identical to the server render. Reading localStorage
+  // during state initialization made every route susceptible to a hydration failure.
+  const [scenario, setScenarioState] = useState<Scenario>("Busy Saturday");
   const value = useMemo(() => ({ scenario, setScenario: (next: Scenario) => { setScenarioState(next); localStorage.setItem("fitos-scenario", next); }, reset: () => { setScenarioState("Busy Saturday"); localStorage.removeItem("fitos-scenario"); } }), [scenario]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
