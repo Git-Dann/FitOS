@@ -16,7 +16,7 @@ select::-ms-expand { display:none; }
 /* Compact product cards retain each garment in full, with no background crop. */
 .recommendation-board { padding:16px!important; }
 .recommendation-board > p { margin:0 0 10px!important; }
-.recommendation-board article { display:grid!important; grid-template-columns:72px minmax(0,1fr) auto; gap:12px!important; min-height:88px; padding:8px 0!important; }
+.recommendation-board article { display:grid!important; grid-template-columns:72px minmax(0,1fr) max-content; gap:14px!important; min-height:96px; padding:12px 18px!important; overflow:hidden; }
 .recommendation-product-image { width:72px; height:72px; border-radius:6px; background:#fff; object-fit:contain; }
 @media(max-width:540px) { .recommendation-board article { grid-template-columns:58px minmax(0,1fr); } .recommendation-product-image { width:58px; height:58px; } .recommendation-board .status { grid-column:2; justify-self:start; } }
 .site-header { height:76px; padding:0 max(24px,calc((100vw - 1280px)/2)); display:flex; align-items:center; gap:36px; border-bottom:1px solid var(--line); background:rgba(247,248,245,.94); position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); }
