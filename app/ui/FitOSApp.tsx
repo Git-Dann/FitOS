@@ -3,19 +3,78 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { associates, products, requests, rooms, type Product, type Request } from "./data";
+import {
+  associates,
+  products,
+  requests,
+  rooms,
+  type Product,
+  type Request,
+} from "./data";
 import { useScenario } from "./scenario-context";
 
-const money = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
+const money = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  maximumFractionDigits: 0,
+});
 
 export function Header() {
   const path = usePathname();
-  const links = [{ href: "/platform", label: "Platform" }, { href: "/demo", label: "Guided demo" }, { href: "/demo/customer", label: "Customer" }, { href: "/demo/associate", label: "Associate" }, { href: "/demo/manager", label: "Manager" }, { href: "/pilot", label: "Pilot plan" }];
+  const [menuOpen, setMenuOpen] = useState(false);
+  const links = [
+    { href: "/platform", label: "Platform" },
+    { href: "/demo", label: "Guided demo" },
+    { href: "/demo/customer", label: "Customer" },
+    { href: "/demo/associate", label: "Associate" },
+    { href: "/demo/manager", label: "Manager" },
+    { href: "/pilot", label: "Pilot plan" },
+  ];
 
-  return <header className="site-header"><Link className="brand" href="/"><span className="brand-mark">F</span><span>FitOS</span></Link><nav aria-label="Primary navigation">{links.map(link => <Link className={path === link.href ? "active" : ""} href={link.href} key={link.href}>{link.label}</Link>)}</nav></header>;
+  return (
+    <header className="site-header">
+      <Link className="brand" href="/" onClick={() => setMenuOpen(false)}>
+        <span className="brand-mark">F</span>
+        <span>FitOS</span>
+      </Link>
+      <button
+        className="mobile-nav-toggle"
+        aria-controls="primary-navigation"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((current) => !current)}
+      >
+        {menuOpen ? "Close" : "Menu"}
+      </button>
+      <nav
+        aria-label="Primary navigation"
+        className={menuOpen ? "mobile-open" : ""}
+        id="primary-navigation"
+      >
+        {links.map((link) => (
+          <Link
+            className={path === link.href ? "active" : ""}
+            href={link.href}
+            key={link.href}
+            onClick={() => setMenuOpen(false)}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
+    </header>
+  );
 }
 
-function Footer() { return <footer><span>FitOS prototype · retail operations, not a customer-facing shop</span><span>Local demonstration data</span></footer>; }
+function Footer() {
+  return (
+    <footer>
+      <span>
+        FitOS prototype · retail operations, not a customer-facing shop
+      </span>
+      <span>Local demonstration data</span>
+    </footer>
+  );
+}
 const journey = [
   { href: "/demo/customer", label: "Customer", detail: "Find and request" },
   { href: "/demo/associate", label: "Associate", detail: "Fulfil and reset" },
@@ -24,31 +83,724 @@ const journey = [
 
 function JourneyContext() {
   const path = usePathname();
-  if (path === "/pilot") return <aside className="journey-context" aria-label="Pilot planning journey"><div><span className="eyebrow">Pilot planning</span><strong>Evidence-led rollout decision</strong></div><ol><li className="complete"><Link href="/demo/customer"><span>01</span><b>Observe</b><small>See the customer request</small></Link></li><li className="complete"><Link href="/demo/associate"><span>02</span><b>Operate</b><small>Test the floor workflow</small></Link></li><li className="complete"><Link href="/demo/manager"><span>03</span><b>Measure</b><small>Review the signals</small></Link></li></ol><Link className="journey-next" href="/demo">Return to guided demo <span>→</span></Link></aside>;
-  const activeIndex = journey.findIndex(item => item.href === path);
+  if (path === "/pilot")
+    return (
+      <aside className="journey-context" aria-label="Pilot planning journey">
+        <div>
+          <span className="eyebrow">Pilot planning</span>
+          <strong>Evidence-led rollout decision</strong>
+        </div>
+        <ol>
+          <li className="complete">
+            <Link href="/demo/customer">
+              <span>01</span>
+              <b>Observe</b>
+              <small>See the customer request</small>
+            </Link>
+          </li>
+          <li className="complete">
+            <Link href="/demo/associate">
+              <span>02</span>
+              <b>Operate</b>
+              <small>Test the floor workflow</small>
+            </Link>
+          </li>
+          <li className="complete">
+            <Link href="/demo/manager">
+              <span>03</span>
+              <b>Measure</b>
+              <small>Review the signals</small>
+            </Link>
+          </li>
+        </ol>
+        <Link className="journey-next" href="/demo">
+          Return to guided demo <span>→</span>
+        </Link>
+      </aside>
+    );
+  const activeIndex = journey.findIndex((item) => item.href === path);
   if (activeIndex < 0) return null;
   const next = journey[activeIndex + 1];
-  return <aside className="journey-context" aria-label="Live demo journey"><div><span className="eyebrow">Live demo journey</span><strong>Step {activeIndex + 1} of {journey.length}</strong></div><ol>{journey.map((item, index) => <li className={index === activeIndex ? "current" : index < activeIndex ? "complete" : ""} key={item.href}><Link href={item.href}><span>{String(index + 1).padStart(2, "0")}</span><b>{item.label}</b><small>{item.detail}</small></Link></li>)}</ol>{next ? <Link className="journey-next" href={next.href}>Continue to {next.label} <span>→</span></Link> : <Link className="journey-next" href="/pilot">Turn this into a pilot plan <span>→</span></Link>}</aside>;
+  return (
+    <aside className="journey-context" aria-label="Live demo journey">
+      <div>
+        <span className="eyebrow">Live demo journey</span>
+        <strong>
+          Step {activeIndex + 1} of {journey.length}
+        </strong>
+      </div>
+      <ol>
+        {journey.map((item, index) => (
+          <li
+            className={
+              index === activeIndex
+                ? "current"
+                : index < activeIndex
+                  ? "complete"
+                  : ""
+            }
+            key={item.href}
+          >
+            <Link href={item.href}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <b>{item.label}</b>
+              <small>{item.detail}</small>
+            </Link>
+          </li>
+        ))}
+      </ol>
+      {next ? (
+        <Link className="journey-next" href={next.href}>
+          Continue to {next.label} <span>→</span>
+        </Link>
+      ) : (
+        <Link className="journey-next" href="/pilot">
+          Turn this into a pilot plan <span>→</span>
+        </Link>
+      )}
+    </aside>
+  );
 }
 
-export function SiteShell({ children }: { children: React.ReactNode }) { return <><Header /><JourneyContext /><main>{children}</main><Footer /></>; }
+export function SiteShell({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <Header />
+      <JourneyContext />
+      <main>{children}</main>
+      <Footer />
+    </>
+  );
+}
 const Shell = SiteShell;
-export function Status({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "good" | "warn" | "dark" }) { return <span className={`status ${tone}`}><i />{children}</span>; }
-export function Metric({ label, value, detail, trend }: { label: string; value: string; detail: string; trend?: string }) { return <article className="metric"><p>{label}</p><strong>{value}</strong><div><span>{detail}</span>{trend && <em>{trend}</em>}</div></article>; }
-function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) { return <article className={`product-card ${compact ? "compact" : ""}`}><div className={`product-thumb ${product.category.toLowerCase()}`}><span>{product.category.slice(0, 2)}</span></div><div className="product-copy"><div><p className="eyebrow">{product.sku}</p><h3>{product.name}</h3></div><p>{product.size} · {product.colour}</p><div className="product-bottom"><strong>{money.format(product.price)}</strong><Status tone={product.confidence === "Confirmed" ? "good" : product.confidence === "Likely" ? "neutral" : "warn"}>{product.stock} in stock · {product.confidence}</Status></div></div></article>; }
-function RequestCard({ request, onAdvance }: { request: Request; onAdvance?: () => void }) { return <article className="request-card"><div className="request-id"><span>Room {String(request.room).padStart(2, "0")}</span><Status tone={request.priority === "Now" ? "warn" : "neutral"}>{request.age} min</Status></div><h3>{request.item}</h3><p>{request.detail} · {request.id}</p><div className="request-actions"><Status tone={request.status === "Picking" ? "dark" : "neutral"}>{request.status}</Status>{onAdvance && request.status !== "Delivered" && <button className="text-button" onClick={onAdvance}>{request.status === "Open" ? "Start pick" : "Mark delivered"} →</button>}</div></article>; }
-function RoomGrid() { return <div className="room-grid">{rooms.map(room => <div className={`room ${room.state.toLowerCase()}`} key={room.id}><span>{String(room.id).padStart(2, "0")}</span><b>{room.state === "Occupied" ? `${room.minutes}m` : room.state === "Assisted" ? "Help" : ""}</b></div>)}</div>; }
-function Chart() { const bars = [42, 58, 47, 72, 64, 83, 76]; return <div className="chart" aria-label="Requests completed across the last seven periods">{bars.map((height, index) => <div className="bar-wrap" key={height}><div className={index === 5 ? "bar latest" : "bar"} style={{ height: `${height}%` }} /><span>{["10", "11", "12", "13", "14", "15", "16"][index]}</span></div>)}</div>; }
-function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) { return <section className="page-intro"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="lede">{description}</p></div>{action}</section>; }
+export function Status({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: "neutral" | "good" | "warn" | "dark";
+}) {
+  return (
+    <span className={`status ${tone}`}>
+      <i />
+      {children}
+    </span>
+  );
+}
+export function Metric({
+  label,
+  value,
+  detail,
+  trend,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  trend?: string;
+}) {
+  return (
+    <article className="metric">
+      <p>{label}</p>
+      <strong>{value}</strong>
+      <div>
+        <span>{detail}</span>
+        {trend && <em>{trend}</em>}
+      </div>
+    </article>
+  );
+}
+function ProductCard({
+  product,
+  compact = false,
+}: {
+  product: Product;
+  compact?: boolean;
+}) {
+  return (
+    <article className={`product-card ${compact ? "compact" : ""}`}>
+      <div className={`product-thumb ${product.category.toLowerCase()}`}>
+        <span>{product.category.slice(0, 2)}</span>
+      </div>
+      <div className="product-copy">
+        <div>
+          <p className="eyebrow">{product.sku}</p>
+          <h3>{product.name}</h3>
+        </div>
+        <p>
+          {product.size} · {product.colour}
+        </p>
+        <div className="product-bottom">
+          <strong>{money.format(product.price)}</strong>
+          <Status
+            tone={
+              product.confidence === "Confirmed"
+                ? "good"
+                : product.confidence === "Likely"
+                  ? "neutral"
+                  : "warn"
+            }
+          >
+            {product.stock} in stock · {product.confidence}
+          </Status>
+        </div>
+      </div>
+    </article>
+  );
+}
+function RequestCard({
+  request,
+  onAdvance,
+}: {
+  request: Request;
+  onAdvance?: () => void;
+}) {
+  return (
+    <article className="request-card">
+      <div className="request-id">
+        <span>Room {String(request.room).padStart(2, "0")}</span>
+        <Status tone={request.priority === "Now" ? "warn" : "neutral"}>
+          {request.age} min
+        </Status>
+      </div>
+      <h3>{request.item}</h3>
+      <p>
+        {request.detail} · {request.id}
+      </p>
+      <div className="request-actions">
+        <Status tone={request.status === "Picking" ? "dark" : "neutral"}>
+          {request.status}
+        </Status>
+        {onAdvance && request.status !== "Delivered" && (
+          <button className="text-button" onClick={onAdvance}>
+            {request.status === "Open" ? "Start pick" : "Mark delivered"} →
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+function RoomGrid() {
+  return (
+    <div className="room-grid">
+      {rooms.map((room) => (
+        <div className={`room ${room.state.toLowerCase()}`} key={room.id}>
+          <span>{String(room.id).padStart(2, "0")}</span>
+          <b>
+            {room.state === "Occupied"
+              ? `${room.minutes}m`
+              : room.state === "Assisted"
+                ? "Help"
+                : ""}
+          </b>
+        </div>
+      ))}
+    </div>
+  );
+}
+function Chart() {
+  const bars = [42, 58, 47, 72, 64, 83, 76];
+  return (
+    <div
+      className="chart"
+      aria-label="Requests completed across the last seven periods"
+    >
+      {bars.map((height, index) => (
+        <div className="bar-wrap" key={height}>
+          <div
+            className={index === 5 ? "bar latest" : "bar"}
+            style={{ height: `${height}%` }}
+          />
+          <span>{["10", "11", "12", "13", "14", "15", "16"][index]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+function PageIntro({
+  eyebrow,
+  title,
+  description,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <section className="page-intro">
+      <div>
+        <p className="eyebrow">{eyebrow}</p>
+        <h1>{title}</h1>
+        <p className="lede">{description}</p>
+      </div>
+      {action}
+    </section>
+  );
+}
 
-export function LandingPage() { return <Shell><section className="hero"><div className="hero-copy"><p className="eyebrow">Fitting rooms, connected</p><h1>Make the fitting room your most responsive sales floor.</h1><p>FitOS helps store teams recognise the product, see confident availability and fulfil requests at the right moment.</p><div className="hero-actions"><Link className="button" href="/demo/customer">Start the live demo <span>→</span></Link><Link className="secondary-link" href="/platform">Explore the platform</Link></div><div className="proof-row"><span><b>32</b> rooms coordinated</span><span><b>1</b> shared operating view</span><span><b>0</b> new hardware required</span></div></div><div className="hero-panel"><div className="panel-heading"><span className="mini-brand">FITOS / LIVE FLOOR</span><Status tone="good">Store ready</Status></div><div className="live-request"><div><span className="request-dot" /> <p>New fitting-room request</p></div><b>Room 05</b><h3>Textured Overshirt</h3><p>M · Olive · picked from Floor B</p><div><Status tone="good">6 confirmed</Status><Status>2 min old</Status></div></div><div className="mini-rooms">{rooms.slice(0, 16).map(room => <i className={room.state.toLowerCase()} key={room.id} />)}</div><p className="micro-copy">The team sees the same live room and request state.</p></div></section><section className="landing-strip"><p>Designed for the moment a customer is deciding.</p><div><span>01</span><b>Identify</b><small>Scan the label already on the garment.</small></div><div><span>02</span><b>Recommend</b><small>Offer products that are relevant and available.</small></div><div><span>03</span><b>Fulfil</b><small>Route requests around real-time floor pressure.</small></div></section></Shell>; }
+export function LandingPage() {
+  return (
+    <Shell>
+      <section className="hero">
+        <div className="hero-copy">
+          <p className="eyebrow">Fitting rooms, connected</p>
+          <h1>Make the fitting room your most responsive sales floor.</h1>
+          <p>
+            FitOS helps store teams recognise the product, see confident
+            availability and fulfil requests at the right moment.
+          </p>
+          <div className="hero-actions">
+            <Link className="button" href="/demo/customer">
+              Start the live demo <span>→</span>
+            </Link>
+            <Link className="secondary-link" href="/platform">
+              Explore the platform
+            </Link>
+          </div>
+          <div className="proof-row">
+            <span>
+              <b>32</b> rooms coordinated
+            </span>
+            <span>
+              <b>1</b> shared operating view
+            </span>
+            <span>
+              <b>0</b> new hardware required
+            </span>
+          </div>
+        </div>
+        <div className="hero-panel">
+          <div className="panel-heading">
+            <span className="mini-brand">FITOS / LIVE FLOOR</span>
+            <Status tone="good">Store ready</Status>
+          </div>
+          <div className="live-request">
+            <div>
+              <span className="request-dot" /> <p>New fitting-room request</p>
+            </div>
+            <b>Room 05</b>
+            <h3>Textured Overshirt</h3>
+            <p>M · Olive · picked from Floor B</p>
+            <div>
+              <Status tone="good">6 confirmed</Status>
+              <Status>2 min old</Status>
+            </div>
+          </div>
+          <div className="mini-rooms">
+            {rooms.slice(0, 16).map((room) => (
+              <i className={room.state.toLowerCase()} key={room.id} />
+            ))}
+          </div>
+          <p className="micro-copy">
+            The team sees the same live room and request state.
+          </p>
+        </div>
+      </section>
+      <section className="landing-strip">
+        <p>Designed for the moment a customer is deciding.</p>
+        <div>
+          <span>01</span>
+          <b>Identify</b>
+          <small>Scan the label already on the garment.</small>
+        </div>
+        <div>
+          <span>02</span>
+          <b>Recommend</b>
+          <small>Offer products that are relevant and available.</small>
+        </div>
+        <div>
+          <span>03</span>
+          <b>Fulfil</b>
+          <small>Route requests around real-time floor pressure.</small>
+        </div>
+      </section>
+    </Shell>
+  );
+}
 
-export function PlatformPage() { return <Shell><PageIntro eyebrow="The platform" title="A calmer operating system for the fitting room." description="Every view starts with product intent, then makes availability and the next best fulfilment action clear to the person doing the work." /><section className="feature-grid"><article className="feature feature-wide"><span>01</span><h2>Barcode-first identification</h2><p>Use the barcode on existing garment labels to establish a precise product, size and colour context—without asking customers to explain it again.</p><div className="barcode">||| |||| || ||||| ||| &nbsp; 5061048301197</div></article><article className="feature"><span>02</span><h2>Stock with context</h2><p>Surface the location and confidence of each option, not a binary stock promise.</p><Status tone="good">Confirmed on floor</Status></article><article className="feature"><span>03</span><h2>Adapt around demand</h2><p>Balance requests across rooms, queue pressure and available associates.</p><div className="capacity-line"><b style={{ width: "68%" }} /></div><small>68% active room capacity</small></article><article className="feature"><span>04</span><h2>Learn from intent</h2><p>See what was asked for, completed, missed or unavailable to guide the next floor move.</p><Link className="text-link" href="/demo/manager">Open manager view →</Link></article></section></Shell>; }
+export function PlatformPage() {
+  return (
+    <Shell>
+      <PageIntro
+        eyebrow="The platform"
+        title="A calmer operating system for the fitting room."
+        description="Every view starts with product intent, then makes availability and the next best fulfilment action clear to the person doing the work."
+      />
+      <section className="feature-grid">
+        <article className="feature feature-wide">
+          <span>01</span>
+          <h2>Barcode-first identification</h2>
+          <p>
+            Use the barcode on existing garment labels to establish a precise
+            product, size and colour context—without asking customers to explain
+            it again.
+          </p>
+          <div className="barcode">
+            ||| |||| || ||||| ||| &nbsp; 5061048301197
+          </div>
+        </article>
+        <article className="feature">
+          <span>02</span>
+          <h2>Stock with context</h2>
+          <p>
+            Surface the location and confidence of each option, not a binary
+            stock promise.
+          </p>
+          <Status tone="good">Confirmed on floor</Status>
+        </article>
+        <article className="feature">
+          <span>03</span>
+          <h2>Adapt around demand</h2>
+          <p>
+            Balance requests across rooms, queue pressure and available
+            associates.
+          </p>
+          <div className="capacity-line">
+            <b style={{ width: "68%" }} />
+          </div>
+          <small>68% active room capacity</small>
+        </article>
+        <article className="feature">
+          <span>04</span>
+          <h2>Learn from intent</h2>
+          <p>
+            See what was asked for, completed, missed or unavailable to guide
+            the next floor move.
+          </p>
+          <Link className="text-link" href="/demo/manager">
+            Open manager view →
+          </Link>
+        </article>
+      </section>
+    </Shell>
+  );
+}
 
-export function CustomerPage() { const [scanned, setScanned] = useState(false); const [requested, setRequested] = useState(false); const primary = products[1]; const options = [products[0], products[3], products[5]]; return <Shell><div className="demo-layout customer"><section className="customer-phone"><div className="phone-top"><span>9:41</span><b>Fitting room 05</b><span>●●●</span></div>{!scanned ? <div className="scan-view"><div className="scan-frame"><i /><i /><i /><i /><div className="scan-lines">|||||||||||</div></div><p className="eyebrow">Scan a garment label</p><h1>Find the right next piece.</h1><p>Use the camera to scan any garment you&apos;d like to build on.</p><button className="button full" onClick={() => setScanned(true)}>Scan demonstration label</button></div> : <div className="scan-result"><p className="eyebrow">Scanned product</p><ProductCard product={primary} compact /><div className="recommendation"><p>Works well with</p><h2>Complete the look</h2>{options.map(product => <div className="option-row" key={product.sku}><div className={`tiny-thumb ${product.category.toLowerCase()}`} /><div><b>{product.name}</b><span>{product.size} · {money.format(product.price)}</span></div><button onClick={() => setRequested(true)}>{requested ? "Added" : "Add"}</button></div>)}</div>{requested && <div className="customer-confirm"><Status tone="good">Request sent to room 05</Status><p>Your chosen items are now with the store team.</p></div>}</div>}</section><aside className="demo-aside"><p className="eyebrow">Customer experience</p><h1>Simple, private and product-led.</h1><p>The customer starts from a garment they already have in hand. FitOS focuses on useful choices and clear fulfilment, rather than styling advice.</p><div className="insight-card"><span>Behind the scenes</span><h3>A room request enters the shared queue with its product context intact.</h3></div></aside></div></Shell>; }
+export function CustomerPage() {
+  const [scanned, setScanned] = useState(false);
+  const [requested, setRequested] = useState(false);
+  const primary = products[1];
+  const options = [products[0], products[3], products[5]];
+  return (
+    <Shell>
+      <div className="demo-layout customer">
+        <section className="customer-phone">
+          <div className="phone-top">
+            <span>9:41</span>
+            <b>Fitting room 05</b>
+            <span>●●●</span>
+          </div>
+          {!scanned ? (
+            <div className="scan-view">
+              <div className="scan-frame">
+                <i />
+                <i />
+                <i />
+                <i />
+                <div className="scan-lines">|||||||||||</div>
+              </div>
+              <p className="eyebrow">Scan a garment label</p>
+              <h1>Find the right next piece.</h1>
+              <p>
+                Use the camera to scan any garment you&apos;d like to build on.
+              </p>
+              <button className="button full" onClick={() => setScanned(true)}>
+                Scan demonstration label
+              </button>
+            </div>
+          ) : (
+            <div className="scan-result">
+              <p className="eyebrow">Scanned product</p>
+              <ProductCard product={primary} compact />
+              <div className="recommendation">
+                <p>Works well with</p>
+                <h2>Complete the look</h2>
+                {options.map((product) => (
+                  <div className="option-row" key={product.sku}>
+                    <div
+                      className={`tiny-thumb ${product.category.toLowerCase()}`}
+                    />
+                    <div>
+                      <b>{product.name}</b>
+                      <span>
+                        {product.size} · {money.format(product.price)}
+                      </span>
+                    </div>
+                    <button onClick={() => setRequested(true)}>
+                      {requested ? "Added" : "Add"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {requested && (
+                <div className="customer-confirm">
+                  <Status tone="good">Request sent to room 05</Status>
+                  <p>Your chosen items are now with the store team.</p>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+        <aside className="demo-aside">
+          <p className="eyebrow">Customer experience</p>
+          <h1>Simple, private and product-led.</h1>
+          <p>
+            The customer starts from a garment they already have in hand. FitOS
+            focuses on useful choices and clear fulfilment, rather than styling
+            advice.
+          </p>
+          <div className="insight-card">
+            <span>Behind the scenes</span>
+            <h3>
+              A room request enters the shared queue with its product context
+              intact.
+            </h3>
+          </div>
+        </aside>
+      </div>
+    </Shell>
+  );
+}
 
-export function AssociatePage() { const [queue, setQueue] = useState(requests); const update = (id: string) => setQueue(current => current.map(item => item.id === id ? { ...item, status: item.status === "Open" ? "Picking" : "Delivered" } : item)); return <Shell><PageIntro eyebrow="Associate view · Floor 1" title="Keep the next useful action in reach." description="Requests are prioritised around room context and their time in queue. Pick, deliver, then return to the floor." action={<Status tone="good">2 associates available</Status>} /><section className="operations-grid"><div className="queue-panel"><div className="section-heading"><div><p className="eyebrow">Live request queue</p><h2>Fulfilment</h2></div><span>{queue.filter(q => q.status !== "Delivered").length} active</span></div><div className="request-list">{queue.map(request => <RequestCard key={request.id} request={request} onAdvance={() => update(request.id)} />)}</div></div><div className="assistant-stack"><article className="pick-card"><p className="eyebrow">Suggested next pick</p><ProductCard product={products[1]} compact /><div className="route"><span>Floor B · Rail 12</span><i /> <span>Room 05</span><b>~1 min</b></div><button className="button full">Start route</button></article><article className="insight-card dark-card"><span>Queue signal</span><h3>Three requests share a stockroom route.</h3><p>Bundle them once the two immediate floor picks are complete.</p></article></div></section></Shell>; }
+export function AssociatePage() {
+  const [queue, setQueue] = useState(requests);
+  const update = (id: string) =>
+    setQueue((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              status: item.status === "Open" ? "Picking" : "Delivered",
+            }
+          : item,
+      ),
+    );
+  return (
+    <Shell>
+      <PageIntro
+        eyebrow="Associate view · Floor 1"
+        title="Keep the next useful action in reach."
+        description="Requests are prioritised around room context and their time in queue. Pick, deliver, then return to the floor."
+        action={<Status tone="good">2 associates available</Status>}
+      />
+      <section className="operations-grid">
+        <div className="queue-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Live request queue</p>
+              <h2>Fulfilment</h2>
+            </div>
+            <span>
+              {queue.filter((q) => q.status !== "Delivered").length} active
+            </span>
+          </div>
+          <div className="request-list">
+            {queue.map((request) => (
+              <RequestCard
+                key={request.id}
+                request={request}
+                onAdvance={() => update(request.id)}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="assistant-stack">
+          <article className="pick-card">
+            <p className="eyebrow">Suggested next pick</p>
+            <ProductCard product={products[1]} compact />
+            <div className="route">
+              <span>Floor B · Rail 12</span>
+              <i /> <span>Room 05</span>
+              <b>~1 min</b>
+            </div>
+            <button className="button full">Start route</button>
+          </article>
+          <article className="insight-card dark-card">
+            <span>Queue signal</span>
+            <h3>Three requests share a stockroom route.</h3>
+            <p>Bundle them once the two immediate floor picks are complete.</p>
+          </article>
+        </div>
+      </section>
+    </Shell>
+  );
+}
 
-export function ManagerPage() { const { scenario } = useScenario(); const occupied = scenario === "Quiet Store" ? 5 : scenario === "Busy Saturday" ? 21 : 13; return <Shell><PageIntro eyebrow="Manager view · Floor 1" title="See pressure before it becomes a queue." description="A live floor overview connects room activity, associate workload and demand signals in one operating view." action={<Status tone={scenario === "Stock Discrepancy" ? "warn" : "good"}>{scenario}</Status>} /><section className="manager-metrics"><Metric label="Rooms active" value={`${occupied} / 32`} detail="Across all fitting rooms" trend="↑ 4" /><Metric label="Open requests" value={scenario === "Busy Saturday" ? "12" : "4"} detail="2 need attention now" trend="↑ 3" /><Metric label="Median fulfilment" value="4m 12s" detail="Last 60 minutes" trend="↓ 46s" /><Metric label="Stock confidence" value="91%" detail="Across requested variants" trend="↑ 2 pts" /></section><section className="manager-grid"><article className="room-panel"><div className="section-heading"><div><p className="eyebrow">Room map</p><h2>Capacity and activity</h2></div><div className="legend"><Status tone="good">Free</Status><Status>Occupied</Status><Status tone="warn">Needs help</Status></div></div><RoomGrid /></article><div className="manager-side"><article className="chart-card"><div className="section-heading"><div><p className="eyebrow">Today</p><h2>Completed requests</h2></div><b>84</b></div><Chart /></article><article className="insight-card"><span>Missed demand</span><h3>Pleated Chino · 32 · Navy</h3><p>Requested 7 times today. Inventory confidence needs a floor check before the next delivery.</p><button className="text-button">Review product signal →</button></article></div></section><section className="team-section"><div className="section-heading"><div><p className="eyebrow">Team workload</p><h2>Associate capacity</h2></div><button className="text-button">View assignments →</button></div><div className="associate-list">{associates.map(person => <article key={person.name}><div className="avatar">{person.name[0]}</div><div><b>{person.name}</b><span>{person.role}</span></div><div className="workload"><i><b style={{ width: `${person.active / person.capacity * 100}%` }} /></i><span>{person.active} of {person.capacity} active</span></div><Status tone={person.state === "Available" ? "good" : person.state === "At capacity" ? "warn" : "neutral"}>{person.state}</Status></article>)}</div></section></Shell>; }
+export function ManagerPage() {
+  const { scenario } = useScenario();
+  const occupied =
+    scenario === "Quiet Store" ? 5 : scenario === "Busy Saturday" ? 21 : 13;
+  return (
+    <Shell>
+      <PageIntro
+        eyebrow="Manager view · Floor 1"
+        title="See pressure before it becomes a queue."
+        description="A live floor overview connects room activity, associate workload and demand signals in one operating view."
+        action={
+          <Status tone={scenario === "Stock Discrepancy" ? "warn" : "good"}>
+            {scenario}
+          </Status>
+        }
+      />
+      <section className="manager-metrics">
+        <Metric
+          label="Rooms active"
+          value={`${occupied} / 32`}
+          detail="Across all fitting rooms"
+          trend="↑ 4"
+        />
+        <Metric
+          label="Open requests"
+          value={scenario === "Busy Saturday" ? "12" : "4"}
+          detail="2 need attention now"
+          trend="↑ 3"
+        />
+        <Metric
+          label="Median fulfilment"
+          value="4m 12s"
+          detail="Last 60 minutes"
+          trend="↓ 46s"
+        />
+        <Metric
+          label="Stock confidence"
+          value="91%"
+          detail="Across requested variants"
+          trend="↑ 2 pts"
+        />
+      </section>
+      <section className="manager-grid">
+        <article className="room-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Room map</p>
+              <h2>Capacity and activity</h2>
+            </div>
+            <div className="legend">
+              <Status tone="good">Free</Status>
+              <Status>Occupied</Status>
+              <Status tone="warn">Needs help</Status>
+            </div>
+          </div>
+          <RoomGrid />
+        </article>
+        <div className="manager-side">
+          <article className="chart-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Today</p>
+                <h2>Completed requests</h2>
+              </div>
+              <b>84</b>
+            </div>
+            <Chart />
+          </article>
+          <article className="insight-card">
+            <span>Missed demand</span>
+            <h3>Pleated Chino · 32 · Navy</h3>
+            <p>
+              Requested 7 times today. Inventory confidence needs a floor check
+              before the next delivery.
+            </p>
+            <button className="text-button">Review product signal →</button>
+          </article>
+        </div>
+      </section>
+      <section className="team-section">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Team workload</p>
+            <h2>Associate capacity</h2>
+          </div>
+          <button className="text-button">View assignments →</button>
+        </div>
+        <div className="associate-list">
+          {associates.map((person) => (
+            <article key={person.name}>
+              <div className="avatar">{person.name[0]}</div>
+              <div>
+                <b>{person.name}</b>
+                <span>{person.role}</span>
+              </div>
+              <div className="workload">
+                <i>
+                  <b
+                    style={{
+                      width: `${(person.active / person.capacity) * 100}%`,
+                    }}
+                  />
+                </i>
+                <span>
+                  {person.active} of {person.capacity} active
+                </span>
+              </div>
+              <Status
+                tone={
+                  person.state === "Available"
+                    ? "good"
+                    : person.state === "At capacity"
+                      ? "warn"
+                      : "neutral"
+                }
+              >
+                {person.state}
+              </Status>
+            </article>
+          ))}
+        </div>
+      </section>
+    </Shell>
+  );
+}
 
-export function PilotPage() { return <Shell><section className="pilot-hero"><p className="eyebrow">Pilot the operating model</p><h1>Start with one floor. Learn what the fitting room is asking for.</h1><p>A focused trial helps teams validate the operating rhythm, product signals and store fit before expanding the experience.</p><Link className="button" href="/demo/manager">Walk through the demo <span>→</span></Link></section><section className="pilot-steps"><article><span>01</span><h2>Align</h2><p>Choose the floor, rooms and the operational questions worth testing.</p></article><article><span>02</span><h2>Run</h2><p>Use FitOS alongside existing labels and store practices.</p></article><article><span>03</span><h2>Review</h2><p>Use observed demand and team feedback to decide what changes next.</p></article></section><section className="pilot-note"><div><p className="eyebrow">What a pilot is designed to answer</p><h2>Can the store act on fitting-room intent with less friction?</h2></div><p>The prototype is deliberately local and deterministic. It demonstrates the operational experience; it does not connect to retailer systems or make performance promises.</p></section></Shell>; }
+export function PilotPage() {
+  return (
+    <Shell>
+      <section className="pilot-hero">
+        <p className="eyebrow">Pilot the operating model</p>
+        <h1>
+          Start with one floor. Learn what the fitting room is asking for.
+        </h1>
+        <p>
+          A focused trial helps teams validate the operating rhythm, product
+          signals and store fit before expanding the experience.
+        </p>
+        <Link className="button" href="/demo/manager">
+          Walk through the demo <span>→</span>
+        </Link>
+      </section>
+      <section className="pilot-steps">
+        <article>
+          <span>01</span>
+          <h2>Align</h2>
+          <p>
+            Choose the floor, rooms and the operational questions worth testing.
+          </p>
+        </article>
+        <article>
+          <span>02</span>
+          <h2>Run</h2>
+          <p>Use FitOS alongside existing labels and store practices.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h2>Review</h2>
+          <p>
+            Use observed demand and team feedback to decide what changes next.
+          </p>
+        </article>
+      </section>
+      <section className="pilot-note">
+        <div>
+          <p className="eyebrow">What a pilot is designed to answer</p>
+          <h2>Can the store act on fitting-room intent with less friction?</h2>
+        </div>
+        <p>
+          The prototype is deliberately local and deterministic. It demonstrates
+          the operational experience; it does not connect to retailer systems or
+          make performance promises.
+        </p>
+      </section>
+    </Shell>
+  );
+}
