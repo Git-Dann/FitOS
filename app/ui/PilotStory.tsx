@@ -44,7 +44,7 @@ export function PilotStory() {
   return (
     <SiteShell>
       <PilotStyles />
-      <main className="pilot-reframed">
+    <section className="pilot-reframed">
         <div className="pilot-kicker">
           <span>FitOS pilot</span>
           <Status tone="good">Evidence-led, not promise-led</Status>
@@ -276,7 +276,7 @@ export function PilotStory() {
             )}
           </form>
         </section>
-      </main>
+    </section>
     </SiteShell>
   );
 }
