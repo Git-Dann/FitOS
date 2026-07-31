@@ -1,2 +1,2 @@
-import { PilotPage } from "../ui/FitOSApp";
-export default function Page() { return <PilotPage />; }
+import { PilotStory } from "../ui/PilotStory";
+export default function Page() { return <PilotStory />; }
