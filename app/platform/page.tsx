@@ -1,2 +1,2 @@
-import { PlatformPage } from "../ui/FitOSApp";
-export default function Page() { return <PlatformPage />; }
+import { MarketingPlatform } from "../ui/Marketing";
+export default function Page() { return <MarketingPlatform />; }

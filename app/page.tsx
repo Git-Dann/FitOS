@@ -1,5 +1,5 @@
-import { LandingPage } from "./ui/FitOSApp";
+import { MarketingHome } from "./ui/Marketing";
 
 export default function Home() {
-  return <LandingPage />;
+  return <MarketingHome />;
 }

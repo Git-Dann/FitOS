@@ -16,7 +16,8 @@ export function Header() {
 }
 
 function Footer() { return <footer><span>FitOS prototype · retail operations, not a customer-facing shop</span><span>Local demonstration data</span></footer>; }
-function Shell({ children }: { children: React.ReactNode }) { return <><Header /><main>{children}</main><Footer /></>; }
+export function SiteShell({ children }: { children: React.ReactNode }) { return <><Header /><main>{children}</main><Footer /></>; }
+const Shell = SiteShell;
 export function Status({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "good" | "warn" | "dark" }) { return <span className={`status ${tone}`}><i />{children}</span>; }
 export function Metric({ label, value, detail, trend }: { label: string; value: string; detail: string; trend?: string }) { return <article className="metric"><p>{label}</p><strong>{value}</strong><div><span>{detail}</span>{trend && <em>{trend}</em>}</div></article>; }
 function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) { return <article className={`product-card ${compact ? "compact" : ""}`}><div className={`product-thumb ${product.category.toLowerCase()}`}><span>{product.category.slice(0, 2)}</span></div><div className="product-copy"><div><p className="eyebrow">{product.sku}</p><h3>{product.name}</h3></div><p>{product.size} · {product.colour}</p><div className="product-bottom"><strong>{money.format(product.price)}</strong><Status tone={product.confidence === "Confirmed" ? "good" : product.confidence === "Likely" ? "neutral" : "warn"}>{product.stock} in stock · {product.confidence}</Status></div></div></article>; }
