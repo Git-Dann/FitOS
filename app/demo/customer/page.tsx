@@ -1,2 +1,2 @@
-import { CustomerPage } from "../../ui/FitOSApp";
-export default function Page() { return <CustomerPage />; }
+import { CustomerExperience } from "../../ui/CustomerExperience";
+export default function Page() { return <CustomerExperience />; }

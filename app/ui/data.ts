@@ -10,11 +10,11 @@ export type Scenario = "Quiet Store" | "Busy Saturday" | "Stock Discrepancy" | "
 export const scenarios: Scenario[] = ["Quiet Store", "Busy Saturday", "Stock Discrepancy", "Batch Pick", "Companion Collection"];
 
 export const products: Product[] = [
-  { name: "Studio Heavyweight Tee", category: "Tee", barcode: "5061048301128", sku: "TEE-ST-001", size: "M", colour: "Chalk", price: 42, stock: 14, confidence: "Confirmed", location: "Floor A · Rail 04", tags: ["casual", "layering"], conversion: 61 },
+  { name: "White Heavyweight Tee", category: "Tee", barcode: "5061048301128", sku: "TEE-ST-001", size: "M", colour: "White", price: 42, stock: 14, confidence: "Confirmed", location: "Floor A · Rail 04", tags: ["casual", "layering"], conversion: 61 },
   { name: "Textured Overshirt", category: "Overshirt", barcode: "5061048301197", sku: "OS-TE-014", size: "M", colour: "Olive", price: 95, stock: 6, confidence: "Confirmed", location: "Floor B · Rail 12", tags: ["layering", "smart casual"], conversion: 54 },
   { name: "Field Jacket", category: "Jacket", barcode: "5061048301272", sku: "JK-FD-022", size: "M", colour: "Stone", price: 160, stock: 2, confidence: "Likely", location: "Stockroom · Bay 3", tags: ["outerwear", "utility"], conversion: 47 },
   { name: "Relaxed Selvedge Jean", category: "Jeans", barcode: "5061048301302", sku: "JN-RS-031", size: "32", colour: "Indigo", price: 125, stock: 8, confidence: "Confirmed", location: "Floor C · Wall 02", tags: ["denim", "casual"], conversion: 58 },
-  { name: "Pleated Chino", category: "Chinos", barcode: "5061048301357", sku: "CH-PL-041", size: "32", colour: "Navy", price: 89, stock: 3, confidence: "Check", location: "Stockroom · Bay 7", tags: ["smart casual", "tailoring"], conversion: 44 },
+  { name: "Pleated Chino", category: "Chinos", barcode: "5061048301357", sku: "CH-PL-041", size: "32", colour: "Charcoal", price: 89, stock: 3, confidence: "Check", location: "Stockroom · Bay 7", tags: ["smart casual", "tailoring"], conversion: 44 },
   { name: "Court Trainer", category: "Trainers", barcode: "5061048301418", sku: "TR-CT-008", size: "9", colour: "White / Green", price: 110, stock: 11, confidence: "Confirmed", location: "Floor D · Wall 01", tags: ["footwear", "casual"], conversion: 63 },
 ];
 
