@@ -1,20 +1,133 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import JsBarcode from "jsbarcode";
 import { SiteShell, Status } from "./FitOSApp";
 import { products, type Product } from "./data";
 import { useScenario } from "./scenario-context";
 
-type Step = "welcome" | "identify" | "room" | "selection" | "explore" | "compare" | "fulfil" | "timeline" | "summary";
-type Outcome = "Keep" | "Maybe" | "Leave" | "Substituted" | "Unavailable" | "Collect later" | "Order";
+type Step =
+  | "welcome"
+  | "identify"
+  | "room"
+  | "selection"
+  | "explore"
+  | "compare"
+  | "fulfil"
+  | "timeline"
+  | "summary";
+type Outcome =
+  | "Keep"
+  | "Maybe"
+  | "Leave"
+  | "Substituted"
+  | "Unavailable"
+  | "Collect later"
+  | "Order";
 const primary = [products[0], products[4], products[1]];
 const recommendations = [products[2], products[5], products[3], products[1]];
-const steps: Step[] = ["welcome", "identify", "room", "selection", "explore", "compare", "fulfil", "timeline", "summary"];
-const labels: Record<Step, string> = { welcome: "Welcome", identify: "Scan", room: "Room", selection: "Selection", explore: "Discover", compare: "Compare", fulfil: "Fulfil", timeline: "Track", summary: "Summary" };
+const steps: Step[] = [
+  "welcome",
+  "identify",
+  "room",
+  "selection",
+  "explore",
+  "compare",
+  "fulfil",
+  "timeline",
+  "summary",
+];
+const labels: Record<Step, string> = {
+  welcome: "Welcome",
+  identify: "Scan",
+  room: "Room",
+  selection: "Selection",
+  explore: "Discover",
+  compare: "Compare",
+  fulfil: "Fulfil",
+  timeline: "Track",
+  summary: "Summary",
+};
 
-function ProductImage({ product, large = false }: { product: Product; large?: boolean }) { return <div className={`customer-product-image ${product.category.toLowerCase()} ${large ? "large" : ""}`}><span>{product.category.slice(0, 2)}</span></div>; }
-function CustomerButton({ children, onClick, muted = false }: { children: React.ReactNode; onClick: () => void; muted?: boolean }) { return <button className={muted ? "customer-button muted" : "customer-button"} onClick={onClick}>{children}<span>→</span></button>; }
-function ScenarioHint({ scenario }: { scenario: string }) { const note = scenario === "Quiet Store" ? "The floor is quiet, so a direct pick is favoured." : scenario === "Busy Saturday" ? "The queue is busy, so the next actions are ranked around room pressure." : scenario === "Stock Discrepancy" ? "One requested variant needs a stock check before it can be confirmed." : scenario === "Batch Pick" ? "A shared stockroom route can collect more than one request." : "A companion item has been prioritised with your current selection."; return <div className="scenario-hint"><i />{note}</div>; }
+function GarmentBarcode({ value }: { value: string }) {
+  const barcodeRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    if (!barcodeRef.current) return;
+
+    JsBarcode(barcodeRef.current, value, {
+      background: "transparent",
+      displayValue: false,
+      format: "CODE128",
+      height: 54,
+      lineColor: "#172723",
+      margin: 0,
+      width: 1.55,
+    });
+  }, [value]);
+
+  return (
+    <svg
+      aria-label={`Barcode ${value}`}
+      className="garment-barcode"
+      ref={barcodeRef}
+      role="img"
+    />
+  );
+}
+
+function ProductImage({
+  product,
+  large = false,
+}: {
+  product: Product;
+  large?: boolean;
+}) {
+  return (
+    <div
+      className={`customer-product-image ${product.category.toLowerCase()} ${large ? "large" : ""}`}
+    >
+      <span>{product.category.slice(0, 2)}</span>
+    </div>
+  );
+}
+function CustomerButton({
+  children,
+  onClick,
+  muted = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  muted?: boolean;
+}) {
+  return (
+    <button
+      className={muted ? "customer-button muted" : "customer-button"}
+      onClick={onClick}
+    >
+      {children}
+      <span>→</span>
+    </button>
+  );
+}
+function ScenarioHint({ scenario }: { scenario: string }) {
+  const note =
+    scenario === "Quiet Store"
+      ? "The floor is quiet, so a direct pick is favoured."
+      : scenario === "Busy Saturday"
+        ? "The queue is busy, so the next actions are ranked around room pressure."
+        : scenario === "Stock Discrepancy"
+          ? "One requested variant needs a stock check before it can be confirmed."
+          : scenario === "Batch Pick"
+            ? "A shared stockroom route can collect more than one request."
+            : "A companion item has been prioritised with your current selection.";
+  return (
+    <div className="scenario-hint">
+      <i />
+      {note}
+    </div>
+  );
+}
 
 export function CustomerExperience() {
   const { scenario } = useScenario();
@@ -22,24 +135,558 @@ export function CustomerExperience() {
   const [code, setCode] = useState("");
   const [room, setRoom] = useState("05");
   const [activeProduct, setActiveProduct] = useState<Product>(primary[0]);
-  const [compare, setCompare] = useState<Product[]>([recommendations[0], recommendations[1]]);
+  const [compare, setCompare] = useState<Product[]>([
+    recommendations[0],
+    recommendations[1],
+  ]);
   const [method, setMethod] = useState("Room delivery");
-  const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({ "White Heavyweight Tee": "Keep", "Pleated Chino": "Maybe", "Textured Overshirt": "Keep" });
+  const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({
+    "White Heavyweight Tee": "Keep",
+    "Pleated Chino": "Maybe",
+    "Textured Overshirt": "Keep",
+  });
   const progress = Math.max(0, steps.indexOf(step));
-  const availability = scenario === "Stock Discrepancy" && activeProduct.category === "Chinos" ? "Needs a stock check" : activeProduct.confidence === "Check" ? "A similar option is available sooner" : `Available in ${activeProduct.size === "32" ? "32" : "Medium"} on the shop floor`;
-  const addCompare = (product: Product) => setCompare(current => current.some(item => item.sku === product.sku) ? current.filter(item => item.sku !== product.sku) : [...current.slice(-1), product]);
-  const next = (target?: Step) => setStep(target ?? steps[Math.min(progress + 1, steps.length - 1)]);
-  const total = useMemo(() => primary.reduce((sum, item) => sum + item.price, 0), []);
+  const availability =
+    scenario === "Stock Discrepancy" && activeProduct.category === "Chinos"
+      ? "Needs a stock check"
+      : activeProduct.confidence === "Check"
+        ? "A similar option is available sooner"
+        : `Available in ${activeProduct.size === "32" ? "32" : "Medium"} on the shop floor`;
+  const addCompare = (product: Product) =>
+    setCompare((current) =>
+      current.some((item) => item.sku === product.sku)
+        ? current.filter((item) => item.sku !== product.sku)
+        : [...current.slice(-1), product],
+    );
+  const next = (target?: Step) =>
+    setStep(target ?? steps[Math.min(progress + 1, steps.length - 1)]);
+  const total = useMemo(
+    () => primary.reduce((sum, item) => sum + item.price, 0),
+    [],
+  );
 
-  return <SiteShell><section className="customer-demo-shell"><aside className="customer-story"><p className="eyebrow">Customer experience · live prototype</p><h1>From a garment in hand to a clear next step.</h1><p>This mobile-first journey keeps the product, availability and fulfilment context together while the customer explores in the fitting room.</p><ScenarioHint scenario={scenario} /><div className="customer-story-list"><span>Barcode-first</span><span>Stock-aware</span><span>Privacy-led</span></div></aside><section className="customer-phone-wrap"><div className="customer-phone"><div className="customer-phone-top"><span>9:41</span><b>FitOS</b><span>●●●</span></div><div className="customer-progress" aria-label={`Step ${progress + 1} of ${steps.length}`}>{steps.map((item, index) => <i className={index <= progress ? "active" : ""} key={item} />)}</div><div className="customer-screen">
-    {step === "welcome" && <div className="customer-welcome"><div className="customer-symbol">F</div><p className="eyebrow">Welcome to your fitting-room session</p><h2>Find the next piece without leaving the room.</h2><p>Scan the label on an item you&apos;re trying. FitOS will show relevant options and request help from the store team when you choose.</p><div className="privacy-note"><b>Your privacy</b><span>This session uses only the products you choose to scan. No sign-in or personal details are needed.</span></div><CustomerButton onClick={() => next("identify")}>Start with a garment</CustomerButton></div>}
-    {step === "identify" && <div className="customer-scan"><p className="eyebrow">Step 1 · Identify a product</p><h2>Scan a garment label</h2><p>Use the barcode already attached to the item, or enter its code.</p><div className="scan-window"><i /><i /><i /><i /><strong>|||||||||||</strong><span>5061048301128</span></div><button className="scan-demo-button" onClick={() => { setActiveProduct(primary[0]); next("room"); }}>Scan demonstration label</button><div className="code-entry"><label htmlFor="product-code">Product code</label><div><input id="product-code" value={code} onChange={event => setCode(event.target.value)} placeholder="e.g. 5061048301128" /><button onClick={() => { if (code.trim()) next("room"); }}>Use code</button></div></div></div>}
-    {step === "room" && <div className="customer-room"><p className="eyebrow">Step 2 · Your fitting room</p><h2>Where should we bring your request?</h2><p>Select the room you&apos;re in so the store team has the right delivery context.</p><div className="room-choice-grid">{["03", "04", "05", "06", "07", "08"].map(item => <button className={room === item ? "selected" : ""} onClick={() => setRoom(item)} key={item}><span>Room</span><b>{item}</b></button>)}</div><div className="room-selection"><Status tone="good">Room {room} selected</Status><p>You can change this at any point before requesting an item.</p></div><CustomerButton onClick={() => next("selection")}>See current selection</CustomerButton></div>}
-    {step === "selection" && <div className="customer-selection"><p className="eyebrow">Step 3 · Your current selection</p><h2>Three pieces, ready to build on.</h2><p>Tap a product to check colour, size, availability and store location.</p><div className="selection-list">{primary.map(product => <button className={activeProduct.sku === product.sku ? "active" : ""} key={product.sku} onClick={() => setActiveProduct(product)}><ProductImage product={product} /><div><b>{product.name}</b><span>{product.colour} · {product.size}</span></div><em>View</em></button>)}</div><div className="product-detail"><ProductImage product={activeProduct} large /><div><span className="product-label">{activeProduct.sku}</span><h3>{activeProduct.name}</h3><p>{activeProduct.colour} · {activeProduct.size} · £{activeProduct.price}</p><div className="size-swatches"><b>Colours</b><i className={activeProduct.category.toLowerCase()} /><i /><i /></div><div className="size-swatches"><b>Sizes</b><span>XS</span><span>S</span><span className="selected">M</span><span>L</span></div><Status tone={availability.includes("check") ? "warn" : "good"}>{availability}</Status><small>{activeProduct.location}</small></div></div><CustomerButton onClick={() => next("explore")}>Explore compatible pieces</CustomerButton></div>}
-    {step === "explore" && <div className="customer-explore"><p className="eyebrow">Step 4 · Ranked for your selection</p><h2>Other layers and options to try.</h2><p>Ranked by compatibility, size availability, store location and fulfilment speed.</p><div className="recommendation-reasons"><span>Pairs with your current selection</span><span>Available sooner</span></div><div className="customer-recommendations">{recommendations.map((product, index) => <article key={product.sku}><ProductImage product={product} /><div><b>{product.name}</b><small>{index === 0 ? "Pairs with your current selection" : index === 1 ? "Available in Medium on the shop floor" : "A similar option is available sooner"}</small><span>{product.colour} · £{product.price}</span></div><button className={compare.some(item => item.sku === product.sku) ? "added" : ""} onClick={() => addCompare(product)}>{compare.some(item => item.sku === product.sku) ? "Comparing" : "Compare"}</button></article>)}</div><CustomerButton onClick={() => next("compare")}>Compare selected options</CustomerButton></div>}
-    {step === "compare" && <div className="customer-compare"><p className="eyebrow">Step 5 · Compare</p><h2>Make the trade-off clear.</h2><p>Compare relevant options with their availability and delivery context.</p><div className="comparison-table"><div className="comparison-row heading"><span>Option</span><span>Fit & style</span><span>Available</span><span>Route</span></div>{compare.map(product => <div className="comparison-row" key={product.sku}><div><ProductImage product={product} /><b>{product.name}</b></div><span>{product.tags.join(" · ")}</span><span>{product.stock} in stock</span><span>{product.location.includes("Floor") ? "Sooner" : "Check first"}</span></div>)}</div><div className="compare-note"><Status tone="good">Recommended</Status><p>{compare[0]?.name ?? "Textured Overshirt"} pairs with your current selection and has a confirmed floor location.</p></div><CustomerButton onClick={() => next("fulfil")}>Choose fulfilment</CustomerButton></div>}
-    {step === "fulfil" && <div className="customer-fulfil"><p className="eyebrow">Step 6 · Fulfilment</p><h2>How would you like to receive it?</h2><p>Your choices are adapted to the room, location and current store pressure.</p><div className="fulfil-choices">{[{ title: "Room delivery", detail: `Bring it to room ${room} when ready`, tag: "Recommended" }, { title: "Collection point", detail: "Pick up when you&apos;re ready to leave the room", tag: "Available" }, { title: "Try an alternative", detail: "Ask for an option available sooner", tag: "Fastest" }].map(item => <button className={method === item.title ? "selected" : ""} onClick={() => setMethod(item.title)} key={item.title}><Status tone={item.tag === "Recommended" ? "good" : "neutral"}>{item.tag}</Status><b>{item.title}</b><span>{item.detail}</span></button>)}</div><ScenarioHint scenario={scenario} /><CustomerButton onClick={() => next("timeline")}>Request this to {method.toLowerCase()}</CustomerButton></div>}
-    {step === "timeline" && <div className="customer-timeline"><p className="eyebrow">Step 7 · Request status</p><h2>Your request is in motion.</h2><p>Textured Overshirt · Medium · Olive</p><div className="timeline"><article className="complete"><i>✓</i><div><b>Request sent</b><span>Room {room} and item context shared with the store team</span></div><time>Now</time></article><article className="complete"><i>✓</i><div><b>Best route selected</b><span>{method} based on product location and floor activity</span></div><time>Now</time></article><article className="current"><i>•</i><div><b>Being prepared</b><span>Floor B · Rail 12 has a confirmed item</span></div><time>Next</time></article><article><i>○</i><div><b>Ready for you</b><span>We&apos;ll update this session when the request is complete</span></div></article></div><div className="timeline-explain">You can keep browsing while your request is prepared.</div><CustomerButton onClick={() => next("summary")}>Finish this session</CustomerButton></div>}
-    {step === "summary" && <div className="customer-summary"><p className="eyebrow">Step 8 · Session summary</p><h2>What worked for you today?</h2><p>Mark each item to help you keep track of your own fitting-room session.</p><div className="summary-items">{primary.map(product => <article key={product.sku}><ProductImage product={product} /><div><b>{product.name}</b><span>{product.colour} · £{product.price}</span><select aria-label={`Outcome for ${product.name}`} value={outcomes[product.name]} onChange={event => setOutcomes(current => ({ ...current, [product.name]: event.target.value as Outcome }))}>{(["Keep", "Maybe", "Leave", "Substituted", "Unavailable", "Collect later", "Order"] as Outcome[]).map(item => <option key={item}>{item}</option>)}</select></div></article>)}</div><div className="session-total"><span>Current selection value</span><b>£{total}</b><small>This is a session summary only—no payment is taken here.</small></div><div className="summary-complete"><Status tone="good">Session saved locally</Status><p>You can return to browse another product or take this summary with you.</p></div><CustomerButton onClick={() => { setStep("identify"); setCode(""); }}>Start another scan</CustomerButton></div>}
-  </div><div className="customer-phone-nav"><span>{labels[step]}</span><button onClick={() => setStep(steps[Math.max(0, progress - 1)])} disabled={step === "welcome"}>‹ Back</button></div></div></section></section></SiteShell>;
+  return (
+    <SiteShell>
+      <section className="customer-demo-shell customer-reframed">
+        <aside className="customer-story customer-brief">
+          <div className="customer-brief-kicker">
+            <Status tone="good">Live customer journey</Status>
+            <span>Room {room} · guided walkthrough</span>
+          </div>
+          <p className="eyebrow">Customer experience</p>
+          <h1>Scan once. See the right next choice.</h1>
+          <p>
+            One existing garment label brings together product context, real
+            availability and a simple route to the fitting room.
+          </p>
+          <ScenarioHint scenario={scenario} />
+          <div
+            className="customer-benefits"
+            aria-label="Customer journey benefits"
+          >
+            <article>
+              <b>01</b>
+              <div>
+                <strong>Recognise</strong>
+                <span>Use the label already on the garment.</span>
+              </div>
+            </article>
+            <article>
+              <b>02</b>
+              <div>
+                <strong>Recommend</strong>
+                <span>Show only relevant, available options.</span>
+              </div>
+            </article>
+            <article>
+              <b>03</b>
+              <div>
+                <strong>Request</strong>
+                <span>Give the floor team a room-aware hand-off.</span>
+              </div>
+            </article>
+          </div>
+          <div className="customer-story-list">
+            <span>No new hardware</span>
+            <span>Room-aware</span>
+            <span>No sign-in</span>
+          </div>
+        </aside>
+        <section
+          className="customer-phone-wrap"
+          aria-label="Interactive customer journey"
+        >
+          <div className="customer-live-caption">
+            <span>Fitting-room companion</span>
+            <b>Stable nine-step walkthrough</b>
+          </div>
+          <div className="customer-phone">
+            <div className="customer-phone-top">
+              <span>9:41</span>
+              <b>FitOS</b>
+              <span>●●●</span>
+            </div>
+            <div className="customer-progress-wrap">
+              <div className="customer-progress-copy">
+                <span>Customer journey</span>
+                <b>
+                  {progress + 1} of {steps.length} · {labels[step]}
+                </b>
+              </div>
+              <div
+                className="customer-progress"
+                aria-label={`Step ${progress + 1} of ${steps.length}`}
+              >
+                {steps.map((item, index) => (
+                  <i className={index <= progress ? "active" : ""} key={item} />
+                ))}
+              </div>
+            </div>
+            <div className="customer-screen">
+              {step === "welcome" && (
+                <div className="customer-welcome">
+                  <div className="customer-symbol">F</div>
+                  <p className="eyebrow">
+                    Welcome to your fitting-room session
+                  </p>
+                  <h2>Find the next piece without leaving the room.</h2>
+                  <p>
+                    Scan the label on an item you&apos;re trying. FitOS will
+                    show relevant options and request help from the store team
+                    when you choose.
+                  </p>
+                  <div className="privacy-note">
+                    <b>Your privacy</b>
+                    <span>
+                      This session uses only the products you choose to scan. No
+                      sign-in or personal details are needed.
+                    </span>
+                  </div>
+                  <CustomerButton onClick={() => next("identify")}>
+                    Start with a garment
+                  </CustomerButton>
+                </div>
+              )}
+              {step === "identify" && (
+                <div className="customer-scan">
+                  <p className="eyebrow">Step 1 · Identify a product</p>
+                  <h2>Scan a garment label</h2>
+                  <p>
+                    Use the barcode already attached to the item, or enter its
+                    code.
+                  </p>
+                  <div
+                    className="scan-window"
+                    aria-label="Demonstration garment label"
+                  >
+                    <div className="scan-label-copy">
+                      <span>FitOS demonstration label</span>
+                      <b>White Heavyweight Tee</b>
+                      <small>Medium · White · TEE-ST-001</small>
+                    </div>
+                    <GarmentBarcode value={primary[0].barcode} />
+                    <span className="scan-code">{primary[0].barcode}</span>
+                  </div>
+                  <button
+                    className="scan-demo-button"
+                    onClick={() => {
+                      setActiveProduct(primary[0]);
+                      next("room");
+                    }}
+                  >
+                    Recognise demonstration label
+                  </button>
+                  <div className="code-entry">
+                    <label htmlFor="product-code">Product code</label>
+                    <div>
+                      <input
+                        id="product-code"
+                        value={code}
+                        onChange={(event) => setCode(event.target.value)}
+                        placeholder="e.g. 5061048301128"
+                      />
+                      <button
+                        onClick={() => {
+                          if (code.trim()) next("room");
+                        }}
+                      >
+                        Use code
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {step === "room" && (
+                <div className="customer-room">
+                  <p className="eyebrow">Step 2 · Your fitting room</p>
+                  <h2>Where should we bring your request?</h2>
+                  <p>
+                    Select the room you&apos;re in so the store team has the
+                    right delivery context.
+                  </p>
+                  <div className="room-choice-grid">
+                    {["03", "04", "05", "06", "07", "08"].map((item) => (
+                      <button
+                        className={room === item ? "selected" : ""}
+                        onClick={() => setRoom(item)}
+                        key={item}
+                      >
+                        <span>Room</span>
+                        <b>{item}</b>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="room-selection">
+                    <Status tone="good">Room {room} selected</Status>
+                    <p>
+                      You can change this at any point before requesting an
+                      item.
+                    </p>
+                  </div>
+                  <CustomerButton onClick={() => next("selection")}>
+                    See current selection
+                  </CustomerButton>
+                </div>
+              )}
+              {step === "selection" && (
+                <div className="customer-selection">
+                  <p className="eyebrow">Step 3 · Your current selection</p>
+                  <h2>Three pieces, ready to build on.</h2>
+                  <p>
+                    Tap a product to check colour, size, availability and store
+                    location.
+                  </p>
+                  <div className="selection-list">
+                    {primary.map((product) => (
+                      <button
+                        className={
+                          activeProduct.sku === product.sku ? "active" : ""
+                        }
+                        key={product.sku}
+                        onClick={() => setActiveProduct(product)}
+                      >
+                        <ProductImage product={product} />
+                        <div>
+                          <b>{product.name}</b>
+                          <span>
+                            {product.colour} · {product.size}
+                          </span>
+                        </div>
+                        <em>View</em>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="product-detail">
+                    <ProductImage product={activeProduct} large />
+                    <div>
+                      <span className="product-label">{activeProduct.sku}</span>
+                      <h3>{activeProduct.name}</h3>
+                      <p>
+                        {activeProduct.colour} · {activeProduct.size} · £
+                        {activeProduct.price}
+                      </p>
+                      <div className="size-swatches">
+                        <b>Colours</b>
+                        <i className={activeProduct.category.toLowerCase()} />
+                        <i />
+                        <i />
+                      </div>
+                      <div className="size-swatches">
+                        <b>Sizes</b>
+                        <span>XS</span>
+                        <span>S</span>
+                        <span className="selected">M</span>
+                        <span>L</span>
+                      </div>
+                      <Status
+                        tone={availability.includes("check") ? "warn" : "good"}
+                      >
+                        {availability}
+                      </Status>
+                      <small>{activeProduct.location}</small>
+                    </div>
+                  </div>
+                  <CustomerButton onClick={() => next("explore")}>
+                    Explore compatible pieces
+                  </CustomerButton>
+                </div>
+              )}
+              {step === "explore" && (
+                <div className="customer-explore">
+                  <p className="eyebrow">Step 4 · Ranked for your selection</p>
+                  <h2>Other layers and options to try.</h2>
+                  <p>
+                    Ranked by compatibility, size availability, store location
+                    and fulfilment speed.
+                  </p>
+                  <div className="recommendation-reasons">
+                    <span>Pairs with your current selection</span>
+                    <span>Available sooner</span>
+                  </div>
+                  <div className="customer-recommendations">
+                    {recommendations.map((product, index) => (
+                      <article key={product.sku}>
+                        <ProductImage product={product} />
+                        <div>
+                          <b>{product.name}</b>
+                          <small>
+                            {index === 0
+                              ? "Pairs with your current selection"
+                              : index === 1
+                                ? "Available in Medium on the shop floor"
+                                : "A similar option is available sooner"}
+                          </small>
+                          <span>
+                            {product.colour} · £{product.price}
+                          </span>
+                        </div>
+                        <button
+                          className={
+                            compare.some((item) => item.sku === product.sku)
+                              ? "added"
+                              : ""
+                          }
+                          onClick={() => addCompare(product)}
+                        >
+                          {compare.some((item) => item.sku === product.sku)
+                            ? "Comparing"
+                            : "Compare"}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                  <CustomerButton onClick={() => next("compare")}>
+                    Compare selected options
+                  </CustomerButton>
+                </div>
+              )}
+              {step === "compare" && (
+                <div className="customer-compare">
+                  <p className="eyebrow">Step 5 · Compare</p>
+                  <h2>Make the trade-off clear.</h2>
+                  <p>
+                    Compare relevant options with their availability and
+                    delivery context.
+                  </p>
+                  <div className="comparison-table">
+                    <div className="comparison-row heading">
+                      <span>Option</span>
+                      <span>Fit & style</span>
+                      <span>Available</span>
+                      <span>Route</span>
+                    </div>
+                    {compare.map((product) => (
+                      <div className="comparison-row" key={product.sku}>
+                        <div>
+                          <ProductImage product={product} />
+                          <b>{product.name}</b>
+                        </div>
+                        <span>{product.tags.join(" · ")}</span>
+                        <span>{product.stock} in stock</span>
+                        <span>
+                          {product.location.includes("Floor")
+                            ? "Sooner"
+                            : "Check first"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="compare-note">
+                    <Status tone="good">Recommended</Status>
+                    <p>
+                      {compare[0]?.name ?? "Textured Overshirt"} pairs with your
+                      current selection and has a confirmed floor location.
+                    </p>
+                  </div>
+                  <CustomerButton onClick={() => next("fulfil")}>
+                    Choose fulfilment
+                  </CustomerButton>
+                </div>
+              )}
+              {step === "fulfil" && (
+                <div className="customer-fulfil">
+                  <p className="eyebrow">Step 6 · Fulfilment</p>
+                  <h2>How would you like to receive it?</h2>
+                  <p>
+                    Your choices are adapted to the room, location and current
+                    store pressure.
+                  </p>
+                  <div className="fulfil-choices">
+                    {[
+                      {
+                        title: "Room delivery",
+                        detail: `Bring it to room ${room} when ready`,
+                        tag: "Recommended",
+                      },
+                      {
+                        title: "Collection point",
+                        detail:
+                          "Pick up when you&apos;re ready to leave the room",
+                        tag: "Available",
+                      },
+                      {
+                        title: "Try an alternative",
+                        detail: "Ask for an option available sooner",
+                        tag: "Fastest",
+                      },
+                    ].map((item) => (
+                      <button
+                        className={method === item.title ? "selected" : ""}
+                        onClick={() => setMethod(item.title)}
+                        key={item.title}
+                      >
+                        <Status
+                          tone={item.tag === "Recommended" ? "good" : "neutral"}
+                        >
+                          {item.tag}
+                        </Status>
+                        <b>{item.title}</b>
+                        <span>{item.detail}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <ScenarioHint scenario={scenario} />
+                  <CustomerButton onClick={() => next("timeline")}>
+                    Request this to {method.toLowerCase()}
+                  </CustomerButton>
+                </div>
+              )}
+              {step === "timeline" && (
+                <div className="customer-timeline">
+                  <p className="eyebrow">Step 7 · Request status</p>
+                  <h2>Your request is in motion.</h2>
+                  <p>Textured Overshirt · Medium · Olive</p>
+                  <div className="timeline">
+                    <article className="complete">
+                      <i>✓</i>
+                      <div>
+                        <b>Request sent</b>
+                        <span>
+                          Room {room} and item context shared with the store
+                          team
+                        </span>
+                      </div>
+                      <time>Now</time>
+                    </article>
+                    <article className="complete">
+                      <i>✓</i>
+                      <div>
+                        <b>Best route selected</b>
+                        <span>
+                          {method} based on product location and floor activity
+                        </span>
+                      </div>
+                      <time>Now</time>
+                    </article>
+                    <article className="current">
+                      <i>•</i>
+                      <div>
+                        <b>Being prepared</b>
+                        <span>Floor B · Rail 12 has a confirmed item</span>
+                      </div>
+                      <time>Next</time>
+                    </article>
+                    <article>
+                      <i>○</i>
+                      <div>
+                        <b>Ready for you</b>
+                        <span>
+                          We&apos;ll update this session when the request is
+                          complete
+                        </span>
+                      </div>
+                    </article>
+                  </div>
+                  <div className="timeline-explain">
+                    You can keep browsing while your request is prepared.
+                  </div>
+                  <CustomerButton onClick={() => next("summary")}>
+                    Finish this session
+                  </CustomerButton>
+                </div>
+              )}
+              {step === "summary" && (
+                <div className="customer-summary">
+                  <p className="eyebrow">Step 9 · Session summary</p>
+                  <h2>What worked for you today?</h2>
+                  <p>
+                    Mark each item to help you keep track of your own
+                    fitting-room session.
+                  </p>
+                  <div className="summary-items">
+                    {primary.map((product) => (
+                      <article key={product.sku}>
+                        <ProductImage product={product} />
+                        <div>
+                          <b>{product.name}</b>
+                          <span>
+                            {product.colour} · £{product.price}
+                          </span>
+                          <select
+                            aria-label={`Outcome for ${product.name}`}
+                            value={outcomes[product.name]}
+                            onChange={(event) =>
+                              setOutcomes((current) => ({
+                                ...current,
+                                [product.name]: event.target.value as Outcome,
+                              }))
+                            }
+                          >
+                            {(
+                              [
+                                "Keep",
+                                "Maybe",
+                                "Leave",
+                                "Substituted",
+                                "Unavailable",
+                                "Collect later",
+                                "Order",
+                              ] as Outcome[]
+                            ).map((item) => (
+                              <option key={item}>{item}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="session-total">
+                    <span>Current selection value</span>
+                    <b>£{total}</b>
+                    <small>
+                      This is a session summary only—no payment is taken here.
+                    </small>
+                  </div>
+                  <div className="summary-complete">
+                    <Status tone="good">Session saved locally</Status>
+                    <p>
+                      You can return to browse another product or take this
+                      summary with you.
+                    </p>
+                  </div>
+                  <CustomerButton
+                    onClick={() => {
+                      setStep("identify");
+                      setCode("");
+                    }}
+                  >
+                    Start another scan
+                  </CustomerButton>
+                </div>
+              )}
+            </div>
+            <div className="customer-phone-nav">
+              <span>{labels[step]}</span>
+              <button
+                onClick={() => setStep(steps[Math.max(0, progress - 1)])}
+                disabled={step === "welcome"}
+              >
+                ‹ Back
+              </button>
+            </div>
+          </div>
+        </section>
+      </section>
+    </SiteShell>
+  );
 }
