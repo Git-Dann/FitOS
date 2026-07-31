@@ -1,2 +1,2 @@
-import { AssociatePage } from "../../ui/FitOSApp";
-export default function Page() { return <AssociatePage />; }
+import { FulfilmentExperience } from "../../ui/FulfilmentExperience";
+export default function Page() { return <FulfilmentExperience />; }
