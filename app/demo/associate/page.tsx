@@ -1,2 +1,2 @@
-import { FulfilmentExperience } from "../../ui/FulfilmentExperience";
-export default function Page() { return <FulfilmentExperience />; }
+import { AssociateOperations } from "../../ui/AssociateOperations";
+export default function Page() { return <AssociateOperations />; }

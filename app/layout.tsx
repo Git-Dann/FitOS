@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { ScenarioProvider } from "./ui/scenario-context";
+import { OperationsProvider } from "./ui/operations-context";
 
 const geist = Geist({ variable: "--font-geist", subsets: ["latin"] });
 
@@ -24,7 +25,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en-GB">
       <body className={geist.variable}>
-        <ScenarioProvider>{children}</ScenarioProvider>
+        <ScenarioProvider><OperationsProvider>{children}</OperationsProvider></ScenarioProvider>
       </body>
     </html>
   );
