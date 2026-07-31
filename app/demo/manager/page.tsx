@@ -1,2 +1,2 @@
-import { ManagerPage } from "../../ui/FitOSApp";
-export default function Page() { return <ManagerPage />; }
+import { ManagerAnalytics } from "../../ui/ManagerAnalytics";
+export default function Page() { return <ManagerAnalytics />; }
