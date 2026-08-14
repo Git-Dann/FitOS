@@ -28,19 +28,24 @@ Session 1 — audit and specification. No platform code.
    C takes gap detail, B is bounded to the manager view.
 7. Claude Code configuration: `CLAUDE.md`, 5 subagents, 4 skills, 4 hooks with `settings.json`.
    Hooks tested against real payloads, including false-positive checks.
+8. Colour system built and **measured**, not asserted: near-black neutral with an orange accent,
+   dark theme default. `docs/design-tokens/tokens.json` plus a runnable checker that gates 31
+   contrast pairs across both themes.
 
 ## changed_files
 
-37 new files, no existing file modified.
+39 new files, no existing file modified.
 
 ```text
 CLAUDE.md
 docs/  master-build-brief · repo-audit · product-spec · gap-model · data-contracts · architecture
        design-concepts · design-system · connector-sdk · security-and-privacy · threat-model
        demo-plan · implementation-plan · spec-review · build-state
-docs/adr/  0001 monorepo · 0002 analytics store · 0003 workflow engine · 0004 semantic layer
-           0005 auth provider · 0006 raw storage · 0007 AI boundary · 0008 hosting target
-.claude/  settings.json · agents/×5 · skills/×4 · hooks/×4
+docs/adr/            0001 monorepo · 0002 analytics store · 0003 workflow engine
+                     0004 semantic layer · 0005 auth provider · 0006 raw storage
+                     0007 AI boundary · 0008 hosting target
+docs/design-tokens/  tokens.json · check-contrast.mjs
+.claude/             settings.json · agents/×5 · skills/×4 · hooks/×4
 ```
 
 ## commands_run
@@ -59,6 +64,7 @@ Node 22, npm 10.9.7.
 | `node --test tests/rendered-html.test.mjs` (after `build:vinext`) | **3 pass, 0 fail** |
 | `npm audit` | 21 advisories, near-all transitive via wrangler/miniflare/ws/sharp/esbuild-kit |
 | Hook payload tests | secret-write block ✓, `.env.example` allowed ✓, DROP/TRUNCATE/unbounded DELETE-UPDATE blocked ✓, `demo:*` allowed ✓, `grep truncate` and `rm -rf ./dist` not false-positived ✓, `rm -rf /` blocked ✓ |
+| `node docs/design-tokens/check-contrast.mjs` | **31 pairs, 0 failing, exit 0** (dark 16, light 15) |
 
 ## test_results
 
@@ -96,7 +102,10 @@ is removed from the table.
 | 3 | Cube × ClickHouse × dbt-clickhouse version compatibility | Pin the matrix; fallback pre-authorised in ADR 0004 and costs nothing because the metric contract is unchanged |
 | 4 | Better Auth is young for a security-critical position | Provider boundary in ADR 0005; JWKS contract tests for expiry, rotation, skew, algorithm confusion |
 | 5 | Losing the only demonstrable asset mid-rewrite | Legacy prototype stays runnable until Phase F; vertical-slice-first sequencing |
-| 6 | Vercel deployment at `fitos-retail-operations.vercel.app` may break when the prototype moves | Open question Q1; Phase A assumes it is live and records the exact setting change |
+
+Risk 6 (Vercel deployment breaking when the prototype moves) is **closed**: the user confirms the
+deployment is live but carries no value now the project is moving to production. Phase A moves the
+prototype without protecting it.
 
 ## next_phase
 
@@ -127,8 +136,11 @@ acceptance checks.
 
 ## open questions for the user
 
-Neither blocks Phase A; both change work in Phase A or F. Detail in
-[spec-review.md](spec-review.md#open-questions-for-the-user).
+None. Both Session 1 questions were answered on 2026-08-14 — see
+[spec-review.md](spec-review.md#questions-answered-by-the-user-2026-08-14).
 
-1. Is the Vercel deployment live and being shown to anyone?
-2. Is the prototype's green/off-white palette the fixed FitOS brand, or was it provisional?
+1. **Vercel deployment** — live, but not worth preserving. Phase A moves the prototype without
+   protecting it.
+2. **Palette** — replaced. Near-black neutral with an orange accent, dark theme default, closer in
+   character to Linear. Tokens in [design-tokens/tokens.json](design-tokens/tokens.json), verified by
+   `node docs/design-tokens/check-contrast.mjs` (31 pairs, 0 failing).

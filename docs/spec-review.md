@@ -134,28 +134,43 @@ Revisit if the legacy tree ever ships to a live host.
 
 ---
 
-## Open questions for the user
+## Questions answered by the user (2026-08-14)
 
-Neither blocks Phase A. Both change work in Phase A or F, so they are better answered early.
+### Q1 — Is the Vercel deployment live? — **answered: live, but not worth preserving**
 
-### Q1 — Is the Vercel deployment currently live?
+`design-qa.md` references `https://fitos-retail-operations.vercel.app/demo/manager`. The user
+confirms it is live but that it carries no value now the project is moving to production.
 
-`design-qa.md` references `https://fitos-retail-operations.vercel.app/demo/manager` as a published
-route. If that deployment is live and being shown to anyone, moving the prototype into `legacy/` will
-break it unless the Vercel project's root directory is updated in the same change.
+**Resolved:** Phase A moves the prototype into `legacy/` without protecting the deployment. No
+Vercel project reconfiguration is required and none should be attempted. If the URL breaks, that is
+the intended outcome. Risk 6 is closed.
 
-**Assumption if unanswered:** treat it as live. Phase A will move the prototype *and* note the exact
-Vercel setting change needed, rather than silently breaking a demo URL.
+### Q2 — Is the existing palette fixed? — **answered: no, replace it**
 
-### Q2 — How much of the existing FitOS brand is fixed?
+The user asks for a near-black neutral with an orange accent, closer in character to Linear.
 
-The prototype's deep-green and off-white palette is genuinely good and satisfies the brief's
-restraint rules, so [docs/design-system.md](design-system.md) adopts it as the starting point for the
-accent and canvas ramps. If FitOS has a brand definition elsewhere — or if the palette was
-provisional — the token ramps should be built from that instead.
+**Resolved:** [docs/design-system.md](design-system.md) §2 is rewritten around a cool near-black
+neutral ramp (`#0B0C0E` canvas) and an orange accent (`#F75F14` fill, `#FF7A3C` on dark text).
+**Dark becomes the default theme**; light remains a tested peer. Values live in
+[`docs/design-tokens/tokens.json`](design-tokens/tokens.json) and are verified by
+`node docs/design-tokens/check-contrast.mjs` — 31 pairs, all passing, exit 0.
 
-**Assumption if unanswered:** the existing palette is the brand, re-expressed as measured 50–950
-ramps with tested contrast in both themes.
+Three findings came out of measuring rather than asserting, and are recorded because each one would
+otherwise have been discovered in Phase E:
+
+1. **White on orange fails AA** at 3.90:1. The label on an accent fill is near-black in *both*
+   themes, at 6.15:1. There is no theme where a white-on-orange button is acceptable.
+2. **Elevation reverses between themes.** Dark conveys it by background luminance, since shadows are
+   invisible on near-black; light inverts it — white panels on a tinted ground, separated by border
+   and shadow. Implementing one and letting the other inherit produces a flat light theme.
+3. **Orange accent collides with amber severity** at 1.65:1 relative luminance, both warm. Resolved
+   by role separation, not hue tuning: accent means interaction only, never "warning"; severity
+   always carries an icon and a text label. The collision is asserted in the checker's output so it
+   cannot be quietly forgotten.
+
+The Linear reference stays consistent with the brief, which permits Linear as an interaction
+reference and forbids copying its colours: this takes the density and near-black character, and the
+orange accent is deliberately not Linear's blue-violet.
 
 ---
 

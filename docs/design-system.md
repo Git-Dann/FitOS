@@ -9,30 +9,106 @@ Three tiers. Components consume tier 3 only — a component that references a ti
 a lint failure, because that is how themes rot.
 
 ```text
-1. primitive   --neutral-50 … --neutral-950, --accent-50 … --accent-950, --red/amber/green/blue-*
+1. primitive   --neutral-50 … --neutral-950, --accent-50 … --accent-950,
+               --status-{critical,high,medium,low}-{400,700}
 2. semantic    --bg-canvas, --bg-surface, --bg-raised, --fg-default, --fg-muted, --fg-subtle,
-               --border-default, --border-strong, --accent-fg, --status-{critical,high,medium,low,info}
-3. component   --row-height, --peek-width, --nav-width, --focus-ring, --chart-grid, --chart-mark-*
+               --border-default, --border-strong, --accent-fg, --accent-fill, --on-accent,
+               --focus-ring, --status-{critical,high,medium,low}
+3. component   --row-height, --peek-width, --nav-width, --chart-grid, --chart-mark-*
 ```
 
-Light and dark are two definitions of tier 2 over the same tier 1. Both are built and tested; dark
-is not an afterthought applied with a filter.
+**Dark is the default theme.** Light is a full peer, built and tested, not an afterthought applied
+with a filter — but the product is designed dark-first and the dark values are the ones tuned by
+eye. Both are two definitions of tier 2 over the same tier 1.
 
 ## 2. Colour
 
-A restrained neutral system, one product accent, and semantic status colours. The legacy prototype's
-deep-green and off-white palette is the starting point for the accent and canvas — it already
-satisfies the brief's restraint rules and carries FitOS brand recognition — but it is re-expressed as
-a full 50–950 ramp with measured contrast rather than the loose hex literals used today.
+A near-black neutral ground with a single orange accent. Values live in
+[`docs/design-tokens/tokens.json`](design-tokens/tokens.json) and are verified by
+`node docs/design-tokens/check-contrast.mjs`, which exits non-zero on any failing pair. That script
+is the source of truth for the ratios quoted below; it moves into `packages/ui` and becomes a CI
+gate in Phase E.
 
-Rules:
+This replaces the legacy prototype's off-white and deep-green palette, which stays in `legacy/`.
+
+### Primitive ramps
+
+```text
+neutral   50 #F7F8F9   100 #EDEEF1   200 #DCDEE3   300 #C0C3CB   400 #9497A1   500 #7A7E88
+         600 #616570   700 #494D55   800 #2E3138   900 #1A1C21   950 #0B0C0E
+
+accent    50 #FFF4ED   100 #FFE6D5   200 #FFC9AA   300 #FFA474   400 #FF7A3C   500 #F75F14
+         600 #E8490A   700 #C0350B   800 #983010   900 #7A2B11   950 #421105
+```
+
+The neutral ramp is very slightly cool, so the near-black ground reads as considered rather than as
+an absence of colour. `#000000` is never used as a background.
+
+### Semantic mapping
+
+| Token | Dark (default) | Light |
+| --- | --- | --- |
+| `bg-canvas` | `#0B0C0E` | `neutral-50` |
+| `bg-surface` | `#131417` | `#FFFFFF` |
+| `bg-raised` | `#24262C` | `#FFFFFF` |
+| `fg-default` | `neutral-100` | `neutral-900` |
+| `fg-muted` | `neutral-400` | `neutral-600` |
+| `fg-subtle` | `neutral-500` | `neutral-500` |
+| `border-default` | `neutral-800` | `neutral-200` |
+| `border-strong` | `neutral-600` | `neutral-500` |
+| `accent-fg` (accent text) | `accent-400` | `accent-700` |
+| `accent-fill` (primary button) | `accent-500` | `accent-500` |
+| `on-accent` (label on fill) | `neutral-950` | `neutral-950` |
+| `focus-ring` | `accent-400` | `accent-600` |
+
+Two consequences worth stating because they are easy to get wrong later:
+
+- **The label on an orange fill is near-black, in both themes.** White on orange measures 3.90:1 and
+  fails AA; near-black on `accent-500` measures 6.15:1. There is no theme in which a white-on-orange
+  button is acceptable here.
+- **Elevation reverses between themes.** Dark conveys it by background luminance, because shadows
+  are invisible on a near-black ground. Light inverts it — panels are white on a tinted ground — and
+  raised surfaces separate by border and shadow rather than by luminance. The contrast checker
+  applies the luminance requirement to dark only, deliberately.
+
+### Accent discipline
+
+Orange is reserved for **interaction**: primary actions, links, focus, selection, the active
+navigation item, and the current position in a list. It is never used to mean "warning", "urgent" or
+"bad".
+
+This matters because `accent-400` and `status-high-400` sit at 1.65:1 relative luminance and are
+both warm — close enough that colour alone cannot separate them. The resolution is role separation,
+not hue tuning: they never appear in the same role, severity always carries an icon and a text
+label, and severity chips use a small coloured dot with neutral text rather than coloured text.
+
+### Status
+
+| Severity | Dark | Light |
+| --- | --- | --- |
+| critical | `#FF6166` | `#AA2429` |
+| high | `#F2CB3D` | `#856400` |
+| medium | `#5EB1EF` | `#1060A3` |
+| low | `#4CC38A` | `#1B6B48` |
+
+### Rules
 
 - Status is never carried by colour alone. Every status has an icon or a text label, for
   colour-vision deficiency and for greyscale printing.
-- Contrast: 4.5:1 for body text, 3:1 for large text and UI boundaries, in both themes. Checked in CI.
+- Contrast: 4.5:1 for body text, 3:1 for large text and non-text UI indicators, in both themes.
+  Verified by the checker, gated in CI.
 - Modelled data uses a distinct, non-decorative treatment — a hatched fill and a `▨` marker — not a
   different hue, because hue alone is exactly the confusion the brief prohibits.
-- Chart marks come from a dedicated ordered ramp, tested for both themes and for deuteranopia.
+- Chart marks come from a dedicated ordered ramp, tested for both themes and for deuteranopia. The
+  accent is not a chart colour; a series must never be mistakable for an interactive element.
+- Never introduce a colour outside these ramps. A one-off hex in a component is a lint error.
+
+### On the Linear reference
+
+The brief takes Linear as an *interaction* reference and explicitly forbids copying its branding or
+colours. This palette is consistent with that: it borrows the character — near-black ground, high
+density, hairline borders, restrained chrome, a single saturated accent doing all the interactive
+work — while the accent itself (orange) is deliberately not Linear's blue-violet.
 
 Prohibited by construction, with lint rules where mechanisable: purple-blue gradients, glass panels,
 glowing borders, giant metric cards, decorative sparkles, random gradient blobs.
@@ -60,8 +136,11 @@ does not reflow its row. No `clamp()` display headlines inside the product — t
 
 4 px base scale: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64. Radii 6–10 px only; `999px` reserved for
 avatars and count badges, not for every control. Borders are 1 px hairlines at `--border-default`;
-`--border-strong` for focus and selection. Two shadow tokens only: `--shadow-peek` and
-`--shadow-menu`. Elevation is otherwise conveyed by background, not by shadow.
+`--border-strong` for selection. Two shadow tokens only: `--shadow-peek` and `--shadow-menu`.
+
+Elevation is theme-dependent, as set out in §2: dark uses background luminance and treats shadow as
+decoration; light uses border and shadow, because a white panel on a tinted ground has nowhere to go
+luminance-wise. Do not implement one mechanism and let the other theme inherit it.
 
 Whitespace is used to group, not to fill. A route that shows three numbers in a viewport is a
 failure of density, which is the main design defect carried over from the prototype.
@@ -137,7 +216,9 @@ Design rules that can be mechanised are:
 - Tier-1 token references inside components — lint error.
 - Missing `aria-label` on icon-only controls — lint error.
 - axe violations on any story or route — CI failure.
-- Contrast checks on both themes — CI failure.
+- `node docs/design-tokens/check-contrast.mjs` (both themes) — CI failure on any pair below its
+  minimum. Runs today; moves into `packages/ui` in Phase E.
+- A colour literal outside the token ramps — lint error.
 
 The rest is caught by screenshot review at 1440 × 900, 1024 × 768 and 390 × 844 per route, compared
 against this document by the design-reviewer subagent before a route is marked complete.
