@@ -144,7 +144,7 @@ def create_mapping_version(
         )
     except UnknownTransformError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
 
     highest = session.execute(

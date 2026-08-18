@@ -459,6 +459,9 @@ def test_every_route_that_touches_tenant_data_is_covered_by_a_cross_tenant_test(
         "/v1/mappings/{mapping_id}/apply",
         "/v1/mappings/{mapping_id}/rollback",
         "/v1/mappings/{mapping_id}/compare/{other_id}",
+        # test_ingest.py: 404 on another tenant's connection, and the stored
+        # key derives from the token's organization rather than the form's.
+        "/v1/ingest/uploads",
     }
     # Routes that deliberately run without a tenant scope, and where the
     # cross-tenant reasoning lives.
@@ -469,6 +472,10 @@ def test_every_route_that_touches_tenant_data_is_covered_by_a_cross_tenant_test(
         # test_auth_routes.py: goes through user_organizations(), which returns
         # only the caller's own rows.
         "/v1/auth/organizations",
+        # test_ingest.py: unauthenticated by design — the signature is the
+        # authentication. A mismatched organization/connection pair finds
+        # nothing because the lookup runs inside the scope the path opens.
+        "/v1/ingest/webhooks/{organization_id}/{connection_id}",
     }
 
     scoped: set[str] = set()

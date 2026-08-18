@@ -12,6 +12,7 @@ dependencies = [
   "alembic>=1.14",
   "pyjwt[crypto]>=2.10",
   "fitos-connector-sdk",
+  "python-multipart>=0.0.20",
 ]
 
 [tool.uv.sources]
