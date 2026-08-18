@@ -60,6 +60,10 @@ from fitos_worker.detectors.data_quality import (
     SchemaDriftConfig,
     SchemaDriftDetector,
 )
+from fitos_worker.detectors.financial_leakage import (
+    FinancialLeakageConfig,
+    FinancialLeakageDetector,
+)
 from fitos_worker.detectors.funnel_drop import (
     FunnelDropConfig,
     FunnelDropDetector,
@@ -374,8 +378,47 @@ def _funnel_drop() -> tuple[Detector, list[MetricReading]]:
     return detector, readings
 
 
+def _financial_leakage() -> tuple[Detector, list[MetricReading]]:
+    detector = FinancialLeakageDetector(
+        FinancialLeakageConfig(
+            rule_id=RULE,
+            version=1,
+            pack_key="test_pack",
+            gap_type="margin_leakage",
+            canonical_entity="fact_financial_line",
+            minimum_observations=30,
+        )
+    )
+    readings = [
+        MetricReading(
+            metric_key="gross_margin_rate",
+            metric_version=1,
+            query_hash="golden-leakage",
+            dimensions={
+                "product_variant_id": scope,
+                "margin_rate": margin,
+                "prior_margin_rate": prior_margin,
+                "revenue_minor": revenue,
+                "prior_revenue_minor": prior_revenue,
+                "currency": "GBP",
+            },
+            value=Decimal(margin),
+            denominator=800,
+            captured_at=WINDOW.end,
+        )
+        for scope, margin, prior_margin, revenue, prior_revenue in [
+            ("variant-steady", "0.355", "0.360", "1000000", "1000000"),
+            ("variant-demand-fall", "0.280", "0.360", "600000", "1000000"),
+            ("variant-leaking", "0.280", "0.360", "1200000", "1000000"),
+            ("variant-cost-creep", "0.330", "0.360", "1000000", "1000000"),
+        ]
+    ]
+    return detector, readings
+
+
 CASES = {
     "attribution": _attribution,
+    "financial_leakage": _financial_leakage,
     "baseline_comparison": _baseline_comparison,
     "funnel_drop": _funnel_drop,
     "source_mismatch": _source_mismatch,

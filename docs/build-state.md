@@ -77,7 +77,7 @@ without the fix.
 | 6 | A gap can be assigned, actioned and resolved with an outcome through the API, with audit rows | `test_vertical_slice.py` asserts the full six-row audit trail in order |
 | 7 | A detector run record captures versions, query hash, window, thresholds, candidates, suppressions, dedupe decisions, duration and errors | `detector_runs` (migration 0007). Written on every run, including ones that found nothing or failed |
 | 8 | Exposure fields are absent from a `frontline` token's payload | Absent, not null and not zero. Two tests: one on the keys, one on the raw response text so a renamed or nested copy fails too |
-| 9 | The twelve detector classes | **Partial — 8 of 12.** Scoped below |
+| 9 | The twelve detector classes | **9 of 12 classes, covering every family in the product-spec table.** Scoped below |
 
 ## completed_outcomes
 
@@ -431,16 +431,16 @@ given one for.
 
 ## Phase D remainder
 
-Eight detector classes are implemented: source mismatch, ratio threshold, freshness, completeness,
-schema drift, attribution comparison, baseline comparison and funnel drop. Between them they cover
-every family in the [product-spec](product-spec.md) table except revenue-to-margin. That is the position [docs/spec-review.md](spec-review.md) T3 records deliberately —
+Nine detector classes are implemented: source mismatch, ratio threshold, freshness, completeness,
+schema drift, attribution comparison, baseline comparison, funnel drop and financial leakage.
+Between them they cover **every family** in the [product-spec](product-spec.md) table. That is the position [docs/spec-review.md](spec-review.md) T3 records deliberately —
 build the slice completely against the full interface, then add the rest — and the five chosen are
 the ones the slice and the suppression machinery need.
 
-Four remain: financial leakage (revenue to gross margin), identity match, trend break, and the
-staffing ratio variant. The staffing and fulfilment families are configurations of the existing
-ratio-threshold and baseline classes rather than new code; only financial leakage needs a genuinely
-new model. Each is a config
+Three of the brief's twelve remain — identity match, trend break, and the staffing ratio variant —
+and none of them is a missing family. The staffing and fulfilment rows in the product-spec table are
+configurations of the existing ratio-threshold and baseline classes; identity match and trend break
+are refinements rather than new coverage. Every family in the table now has a class behind it. Each is a config
 plus a `detect` method against an interface that already exists; the framework behaviours they share
 — sufficiency refusal, ordering, error isolation, run records — are written and tested once, so a
 new class inherits them rather than reimplementing them.
