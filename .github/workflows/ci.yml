@@ -134,6 +134,50 @@ jobs:
       - run: uv sync --all-packages --frozen
       - run: uv run pytest data -q
 
+  workflows:
+    name: Temporal workflows (determinism + live)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.2-alpine
+        env:
+          POSTGRES_USER: temporal
+          POSTGRES_PASSWORD: temporal_local_only
+          POSTGRES_DB: temporal
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U temporal"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      temporal:
+        image: temporalio/auto-setup:1.25.2
+        env:
+          DB: postgres12
+          DB_PORT: "5432"
+          POSTGRES_USER: temporal
+          POSTGRES_PWD: temporal_local_only
+          POSTGRES_SEEDS: postgres
+        ports: ["7233:7233"]
+    env:
+      FITOS_TEMPORAL_TARGET: 127.0.0.1:7233
+      # A workflow that type-checks can still deadlock or mishandle a child
+      # failure. A skip here would read as a passing engine.
+      FITOS_REQUIRE_TEMPORAL: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --frozen
+      - name: Wait for Temporal
+        run: |
+          for i in $(seq 1 60); do
+            if (echo > /dev/tcp/127.0.0.1/7233) 2>/dev/null; then echo ready; exit 0; fi
+            sleep 2
+          done
+          echo "Temporal did not become reachable" >&2
+          exit 1
+      - run: uv run pytest services/worker/tests/test_workflows.py -q
+
   build:
     name: Production build
     runs-on: ubuntu-latest

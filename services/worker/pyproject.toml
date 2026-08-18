@@ -2,7 +2,7 @@
 name = "fitos-worker"
 version = "0.0.0"
 requires-python = ">=3.11"
-dependencies = ["fitos-connector-sdk", "fitos-connector-csv"]
+dependencies = ["fitos-connector-sdk", "fitos-connector-csv", "temporalio>=1.8"]
 
 [tool.uv.sources]
 fitos-connector-sdk = { workspace = true }
