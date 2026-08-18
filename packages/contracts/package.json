@@ -17,6 +17,8 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./lifecycle": "./src/lifecycle.ts"
+    "./lifecycle": "./src/lifecycle.ts",
+    "./metric-catalogue.json": "./src/metric-catalogue.json",
+    "./gap-lifecycle.json": "./src/gap-lifecycle.json"
   }
 }

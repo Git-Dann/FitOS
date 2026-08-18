@@ -15,6 +15,7 @@
  * StrictMode and Suspense replays — which is exactly the kind of bug that
  * appears only when the list gets long enough to matter.
  */
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoGap, Severity } from "@/lib/demo-gaps";
 import { groupBySeverity } from "@/lib/demo-gaps";
@@ -62,6 +63,7 @@ export function GapLedger({
 
   const flat = useMemo(() => groups.flatMap((group) => group.rows.map((row) => row.gap)), [groups]);
 
+  const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
   const [peekOpen, setPeekOpen] = useState(false);
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -89,6 +91,14 @@ export function GapLedger({
       } else if (event.key === " ") {
         event.preventDefault();
         setPeekOpen((open) => !open);
+      } else if (event.key === "Enter") {
+        // Enter opens the detail route; Space peeks. Concept A's keyboard model
+        // separates "look without losing my place" from "go and investigate".
+        const target = flat[activeIndex];
+        if (target) {
+          event.preventDefault();
+          router.push("/gaps/" + target.id);
+        }
       } else if (event.key === "Escape") {
         setPeekOpen(false);
       }
@@ -98,7 +108,7 @@ export function GapLedger({
     return () => window.removeEventListener("keydown", onKeyDown);
     // Re-subscribing when the row count changes is cheap, and it keeps the
     // clamp honest without writing a ref during render.
-  }, [total]);
+  }, [total, flat, activeIndex, router]);
 
   // §8: "no gaps" (good) and "no data" (bad) must never look the same.
   if (total === 0) {

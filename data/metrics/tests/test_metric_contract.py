@@ -482,3 +482,82 @@ def test_every_example_executes_and_matches(registry: MetricRegistry, seeded: No
             checked += 1
 
     assert checked >= 2, "no examples were executed; this test proved nothing"
+
+
+# ---------------------------------------------------------------------------
+# The product catalogue
+# ---------------------------------------------------------------------------
+
+
+def test_metric_catalogue_matches_the_definitions() -> None:
+    """The committed catalogue is what the metrics route renders.
+
+    If it drifts from the YAML, the product shows a metric that no longer
+    exists, or claims a certification the definition does not support.
+    """
+    import json
+    import sys
+    from pathlib import Path
+
+    tools = Path(__file__).resolve().parents[3] / "services" / "api" / "tools"
+    sys.path.insert(0, str(tools))
+    from export_metric_catalogue import CATALOGUE_PATH, build
+
+    assert CATALOGUE_PATH.exists(), (
+        "packages/contracts/src/metric-catalogue.json is missing. Regenerate with "
+        "`uv run python services/api/tools/export_metric_catalogue.py`."
+    )
+    assert json.loads(CATALOGUE_PATH.read_text()) == build(), (
+        "The metric catalogue has drifted from data/metrics/definitions. Regenerate with "
+        "`uv run python services/api/tools/export_metric_catalogue.py`."
+    )
+
+
+def test_the_catalogue_never_carries_a_formula() -> None:
+    """RELEASE GATE for the metrics route.
+
+    `measure_expression` is gated by `metric.view_query_detail`, and a JSON file
+    compiled into a client bundle cannot enforce a capability — it ships to
+    everyone who loads the page, whatever their role. Exporting it here would
+    put every formula in every visitor's browser while the API still carefully
+    withholds it.
+
+    Checked against the serialised bytes, not the keys: a formula nested inside
+    a description or an example would pass a key check and still be published.
+    """
+    import json
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "services" / "api" / "tools"))
+    from export_metric_catalogue import build
+
+    serialised = json.dumps(build())
+    registry = MetricRegistry.load()
+
+    assert registry.definitions, "an empty registry would make this assertion vacuous"
+    for definition in registry.definitions:
+        expression = definition.measure_expression.strip()
+        assert expression, f"{definition.key} has no expression; the check would prove nothing"
+        assert expression not in serialised, (
+            f"{definition.key}'s measure_expression reached the client catalogue"
+        )
+        # The distinctive fragment too, in case whitespace differs.
+        fragment = expression.split("(")[0].strip()
+        if len(fragment) > 4:
+            assert fragment not in serialised, (
+                f"{definition.key}'s formula fragment {fragment!r} reached the client catalogue"
+            )
+
+
+def test_the_catalogue_is_not_trivially_empty() -> None:
+    """A drift test and a leak test over an empty catalogue both pass."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "services" / "api" / "tools"))
+    from export_metric_catalogue import build
+
+    catalogue = build()
+    assert len(catalogue["metrics"]) >= 3
+    assert all(entry["identity"] for entry in catalogue["metrics"])

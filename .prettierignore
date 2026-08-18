@@ -30,3 +30,4 @@ services/worker/tests/golden/
 # it would fail that test on the next run. Same reasoning as the golden
 # fixtures above: a generator and a formatter cannot both own a file.
 packages/contracts/src/gap-lifecycle.json
+packages/contracts/src/metric-catalogue.json

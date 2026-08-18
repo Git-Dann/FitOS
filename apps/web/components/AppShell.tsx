@@ -7,6 +7,7 @@
  * shape of the product while being honest about what is built is the compromise
  * this makes.
  */
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 interface NavEntry {
@@ -18,11 +19,11 @@ interface NavEntry {
 }
 
 const PRIMARY: NavEntry[] = [
-  { label: "Inbox", glyph: "⌂", count: 8, href: "/", current: true },
+  { label: "Inbox", glyph: "⌂", count: 8, href: "/" },
   { label: "Gaps", glyph: "⚑" },
   { label: "Explore", glyph: "⌕" },
-  { label: "Metrics", glyph: "∑" },
-  { label: "Sources", glyph: "⇄" },
+  { label: "Metrics", glyph: "∑", href: "/metrics" },
+  { label: "Sources", glyph: "⇄", href: "/sources" },
   { label: "Playbooks", glyph: "▤" },
   { label: "Outcomes", glyph: "✓" },
 ];
@@ -54,19 +55,25 @@ function NavItem({ entry }: { entry: NavEntry }) {
     );
   }
   return (
-    <a className="nav-item" href={entry.href} aria-current={entry.current ? "page" : undefined}>
+    <Link className="nav-item" href={entry.href} aria-current={entry.current ? "page" : undefined}>
       {content}
-    </a>
+    </Link>
   );
 }
 
 export function AppShell({
   title,
   meta,
+  current = "/",
+  demoNote = "Every gap below is fictional.",
   children,
 }: {
   title: string;
   meta: string;
+  current?: string;
+  /** What is fictional on *this* route. A banner that says "every gap below"
+   *  on a page with no gaps is a banner people learn to stop reading. */
+  demoNote?: string;
   children: ReactNode;
 }) {
   return (
@@ -79,7 +86,7 @@ export function AppShell({
           <span>Northstar</span>
         </div>
         {PRIMARY.map((entry) => (
-          <NavItem key={entry.label} entry={entry} />
+          <NavItem key={entry.label} entry={{ ...entry, current: entry.href === current }} />
         ))}
         <div className="nav-section">Views</div>
         {VIEWS.map((entry) => (
@@ -99,9 +106,8 @@ export function AppShell({
         <div className="demo-banner">
           <span aria-hidden="true">▨</span>
           <span>
-            <strong>Demonstration data.</strong> Every gap below is fictional. The detectors,
-            exposure and confidence models that shape these rows are real and tested; the readings
-            they ran against are not.
+            <strong>Demonstration data.</strong> {demoNote} The detectors, exposure and confidence
+            models that shape these rows are real and tested; the readings they ran against are not.
           </span>
         </div>
 
