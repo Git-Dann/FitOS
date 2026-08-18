@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [tool.uv.workspace]
-members = ["services/api", "services/worker"]
+members = ["services/api", "services/worker", "connectors/sdk"]
 
 [tool.uv]
 dev-dependencies = [
@@ -33,7 +33,7 @@ strict = true
 warn_unreachable = true
 
 [tool.pytest.ini_options]
-testpaths = ["services"]
+testpaths = ["services", "connectors"]
 asyncio_mode = "auto"
 markers = [
   "integration: requires running infrastructure (postgres, clickhouse, minio, temporal)",

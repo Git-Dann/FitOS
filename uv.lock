@@ -10,6 +10,7 @@ resolution-markers = [
 members = [
     "fitos",
     "fitos-api",
+    "fitos-connector-sdk",
     "fitos-worker",
 ]
 
@@ -394,6 +395,23 @@ requires-dist = [
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.10" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
+]
+
+[[package]]
+name = "fitos-connector-sdk"
+version = "0.0.0"
+source = { editable = "connectors/sdk" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "pydantic", specifier = ">=2.10" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 
 [[package]]
