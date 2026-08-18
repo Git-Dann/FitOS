@@ -48,3 +48,556 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Phase E — the Gap Ledger (Concept A).
+
+   Every colour is a semantic token; no literal appears below, which is what
+   keeps the light theme honest. Elevation is theme-dependent per §4: dark
+   carries it on background luminance, light on border and shadow, and neither
+   inherits the other's mechanism.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --row-height-compact: 32px;
+  --row-height-comfortable: 44px;
+  --row-height-touch: 48px;
+
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+
+  --nav-width: 216px;
+  --peek-width: 480px;
+
+  --shadow-peek: 0 16px 48px rgb(0 0 0 / 0.45);
+  --shadow-menu: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+:root[data-theme="light"] {
+  /* Light needs a shallower shadow: the same alpha on a tinted ground reads as
+     dirt rather than elevation. */
+  --shadow-peek: 0 16px 40px rgb(16 20 28 / 0.14);
+  --shadow-menu: 0 8px 20px rgb(16 20 28 / 0.1);
+}
+
+/* --- shell ---------------------------------------------------------------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--nav-width) 1fr;
+  min-height: 100vh;
+}
+
+.nav {
+  border-right: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 14px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nav-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  display: grid;
+  place-items: center;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.nav-section {
+  margin-top: 16px;
+  padding: 0 8px 6px;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: var(--bg-raised);
+  color: var(--fg-default);
+}
+
+.nav-item[aria-current="page"] {
+  background: var(--bg-raised);
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
+.nav-count {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- top bar -------------------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.topbar-meta {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-default);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+/* --- demo banner ---------------------------------------------------------- */
+
+/* product-spec.md §8: demo data is labelled on every surface where it appears,
+   including screenshots. Not dismissible for that reason. */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-size: var(--text-xs);
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-default);
+  color: var(--fg-muted);
+}
+
+.demo-banner strong {
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
+/* --- group headers and rows ---------------------------------------------- */
+
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 6px;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.gap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.gap-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border-default);
+  padding: 6px 16px 8px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.gap-row:hover {
+  background: var(--bg-surface);
+}
+
+.gap-row[aria-current="true"] {
+  background: var(--bg-raised);
+  box-shadow: inset 2px 0 0 var(--accent-fill);
+}
+
+.gap-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.gap-title {
+  font-size: var(--text-sm);
+  color: var(--fg-default);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.gap-ref {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.gap-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 3px;
+  padding-left: 26px;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gap-scope {
+  color: var(--fg-subtle);
+}
+
+/* --- chips ---------------------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border: 1px solid var(--border-default);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+/* Severity never relies on colour alone — each chip carries a glyph and a
+   label, per §9 (non-colour status cues). */
+.chip-critical {
+  color: var(--status-critical-400);
+  border-color: var(--status-critical-700);
+}
+.chip-high {
+  color: var(--status-high-400);
+  border-color: var(--status-high-700);
+}
+.chip-medium {
+  color: var(--status-medium-400);
+  border-color: var(--status-medium-700);
+}
+.chip-low {
+  color: var(--status-low-400);
+  border-color: var(--status-low-700);
+}
+
+:root[data-theme="light"] .chip-critical {
+  color: var(--status-critical-700);
+}
+:root[data-theme="light"] .chip-high {
+  color: var(--status-high-700);
+}
+:root[data-theme="light"] .chip-medium {
+  color: var(--status-medium-700);
+}
+:root[data-theme="light"] .chip-low {
+  color: var(--status-low-700);
+}
+
+.chip-glyph {
+  font-size: var(--text-2xs);
+  line-height: 1;
+}
+
+/* --- confidence meter ----------------------------------------------------- */
+
+.confidence {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.confidence-pips {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.pip {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.pip-on {
+  background: var(--fg-muted);
+}
+
+/* --- exposure ------------------------------------------------------------- */
+
+.exposure {
+  color: var(--fg-default);
+}
+
+.exposure-none {
+  color: var(--fg-subtle);
+}
+
+/* A modelled figure is marked wherever it appears. gap-model.md §3: observed
+   and modelled values are never rendered by the same component without the
+   distinction being visible. */
+.modelled-mark {
+  color: var(--fg-subtle);
+  font-size: var(--text-2xs);
+}
+
+/* --- peek ----------------------------------------------------------------- */
+
+.peek {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--peek-width);
+  max-width: 92vw;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-default);
+  box-shadow: var(--shadow-peek);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  z-index: 20;
+}
+
+.peek-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border-default);
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface);
+}
+
+.peek-title {
+  font-size: var(--text-lg);
+  margin: 0;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.peek-close {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--fg-muted);
+  cursor: pointer;
+  height: 24px;
+  min-width: 24px;
+  font-size: var(--text-xs);
+}
+
+.peek-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.peek-label {
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  margin: 0 0 8px;
+}
+
+.peek-grid {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 6px 12px;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.peek-grid dt {
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+}
+
+.peek-grid dd {
+  margin: 0;
+}
+
+.exposure-bar {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  margin: 10px 0 6px;
+}
+
+.exposure-base {
+  position: absolute;
+  top: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent-fill);
+  transform: translateX(-50%);
+}
+
+.assumption {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  padding: 6px 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.assumption b {
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
+.evidence-item {
+  font-size: var(--text-xs);
+  padding: 6px 0;
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.evidence-item .grow {
+  flex: 1;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+}
+
+.reason-codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* --- empty state ---------------------------------------------------------- */
+
+/* §8: "no gaps" (good) and "no data" (bad) must never look the same. */
+.empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.keyboard-hint {
+  padding: 10px 16px 40px;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+kbd {
+  font-family: inherit;
+  font-size: var(--text-2xs);
+  border: 1px solid var(--border-default);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 4px;
+  color: var(--fg-muted);
+}
+
+/* --- tablet --------------------------------------------------------------- */
+
+@media (max-width: 1080px) {
+  .shell {
+    grid-template-columns: 56px 1fr;
+  }
+  .nav-label,
+  .nav-section {
+    display: none;
+  }
+  .nav-brand span:last-child {
+    display: none;
+  }
+  .peek {
+    width: 60vw;
+  }
+}
+
+@media (max-width: 720px) {
+  .peek {
+    width: 100vw;
+  }
+  .gap-row-meta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* A grid item defaults to `min-width: auto`, which means a nowrap child can
+   push the column wider than its track instead of being truncated. Without
+   this the ledger scrolls sideways on a phone, which fails the 320px reflow
+   requirement in §9 — and it fails silently, because it looks fine on a
+   desktop. */
+.shell > main {
+  min-width: 0;
+}
+
+.gap-row-top,
+.gap-title {
+  min-width: 0;
+}

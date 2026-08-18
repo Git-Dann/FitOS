@@ -1,11 +1,16 @@
+import { AppShell } from "@/components/AppShell";
+import { GapLedger } from "@/components/GapLedger";
+import { DEMO_AS_OF, DEMO_GAPS } from "@/lib/demo-gaps";
+import { dateTime } from "@/lib/format";
+
 export default function Home() {
+  const open = DEMO_GAPS.filter((gap) => gap.status !== "resolved" && gap.status !== "dismissed");
   return (
-    <main style={{ padding: 32, maxWidth: 640 }}>
-      <h1 style={{ fontSize: 22, lineHeight: 1.3, margin: 0 }}>FitOS Gap Intelligence</h1>
-      <p style={{ color: "var(--fg-muted)", marginTop: 12 }}>
-        Phase A scaffold. The product shell, gap inbox and detail views arrive in Phase E — see{" "}
-        <code>docs/implementation-plan.md</code>.
-      </p>
-    </main>
+    <AppShell
+      title={`Inbox · ${open.length} open`}
+      meta={`as of ${dateTime(DEMO_AS_OF)} · 4 sources · 2 stale`}
+    >
+      <GapLedger gaps={open} />
+    </AppShell>
   );
 }
