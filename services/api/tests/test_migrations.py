@@ -315,6 +315,89 @@ def test_a_role_is_created_before_it_is_granted_anything() -> None:
         assert create_index < grant_index, statements
 
 
+@requires_db
+def test_a_pre_existing_role_has_its_password_re_asserted() -> None:
+    """The bug `IF NOT EXISTS` alone produces, reproduced.
+
+    A cluster where the role already exists keeps whatever password it was first
+    created with. The migration reports success and the application then cannot
+    authenticate — a failure a fresh CI database can never reproduce and a
+    long-lived environment reproduces exactly once, at the worst time. This
+    caught it against a local cluster whose roles predated the current
+    configuration; the whole API suite was failing on `password authentication
+    failed for user "fitos_app"` while the migration claimed success.
+
+    On the destructive-command rule in CLAUDE.md: this creates a role with a
+    random name seconds earlier, uses it, and removes it. It owns nothing and no
+    tenant data can be reachable through it — the same reasoning the throwaway
+    database fixture in conftest.py sets out.
+    """
+    assert ADMIN_URL
+    from fitos_api.tenancy_sql import _create_or_reassert
+
+    role = f"fitos_probe_{uuid.uuid4().hex[:10]}"
+    admin = create_engine(ADMIN_URL, isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as conn:
+            conn.execute(text(f"CREATE ROLE {role} LOGIN PASSWORD 'stale_password_xyz'"))
+            conn.execute(text(_create_or_reassert(role, "fresh_password_abc")))
+
+        scheme, rest = ADMIN_URL.split("://", 1)
+        host_and_db = rest.split("@", 1)[1]
+        as_role = create_engine(f"{scheme}://{role}:fresh_password_abc@{host_and_db}")
+        with as_role.connect() as conn:
+            assert conn.execute(text("SELECT current_user")).scalar() == role
+        as_role.dispose()
+    finally:
+        with admin.connect() as conn:
+            conn.execute(text(f"DROP ROLE IF EXISTS {role}"))
+
+
+@requires_db
+def test_a_pre_existing_role_has_bypassrls_taken_back_off_it() -> None:
+    """NOBYPASSRLS is the control that makes every RLS policy mean anything.
+
+    If somebody grants BYPASSRLS to debug something at 2am, nothing puts it
+    back — and `test_every_org_scoped_table_has_rls_enabled_and_forced` still
+    passes, because the policies do exist and are simply not being applied to
+    that role. Re-asserting on every migration makes the drift self-healing.
+    """
+    assert ADMIN_URL
+    from fitos_api.tenancy_sql import _create_or_reassert
+
+    role = f"fitos_probe_{uuid.uuid4().hex[:10]}"
+    admin = create_engine(ADMIN_URL, isolation_level="AUTOCOMMIT")
+    try:
+        with admin.connect() as conn:
+            conn.execute(text(f"CREATE ROLE {role} LOGIN PASSWORD 'stale_password_xyz' BYPASSRLS"))
+            drifted = conn.execute(
+                text("SELECT rolbypassrls FROM pg_roles WHERE rolname = :r"), {"r": role}
+            ).scalar()
+            assert drifted is True, "the test did not manage to create the drift it checks for"
+
+            conn.execute(text(_create_or_reassert(role, "fresh_password_abc")))
+
+            restored = conn.execute(
+                text("SELECT rolbypassrls FROM pg_roles WHERE rolname = :r"), {"r": role}
+            ).scalar()
+        assert restored is False, "BYPASSRLS survived the migration; every policy is void"
+    finally:
+        with admin.connect() as conn:
+            conn.execute(text(f"DROP ROLE IF EXISTS {role}"))
+
+
+def test_role_creation_handles_both_the_absent_and_present_cases() -> None:
+    """Structural companion to the two behavioural tests above, so a refactor
+    that drops the ELSE branch fails even without a database."""
+    from fitos_api.tenancy_sql import create_auth_role, create_roles
+
+    for statements in (create_roles("valid_password"), create_auth_role("valid_password")):
+        ddl = next(s for s in statements if "CREATE ROLE" in s)
+        assert "IF NOT EXISTS" in ddl
+        assert "ELSE" in ddl, "an existing role would keep its old password"
+        assert ddl.count("NOBYPASSRLS") == 2, "both branches must assert NOBYPASSRLS"
+
+
 def test_the_migration_creates_every_trigger_the_code_declares(migrated_database: str) -> None:
     """Triggers are the third thing that can drift, after tables and indexes.
 

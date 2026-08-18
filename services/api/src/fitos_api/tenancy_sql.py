@@ -69,6 +69,40 @@ ORG_SCOPED_TABLES: tuple[str, ...] = tuple(TABLE_GRANTS)
 _PASSWORD_PATTERN = re.compile(r"[A-Za-z0-9_.\-]{8,128}")
 
 
+def _create_or_reassert(role: str, password: str) -> str:
+    """Create the role, or re-assert its password and attributes if it exists.
+
+    `IF NOT EXISTS` alone is the obvious shape and it is wrong in a way that
+    only appears on a cluster a migration has been run against before. Two
+    failures follow from it:
+
+    **The password silently diverges.** The migration reports success and the
+    application then cannot authenticate, because the role kept whatever
+    password it was first created with. A fresh CI database never reproduces
+    this; a long-lived environment reproduces it exactly once, at the worst
+    time.
+
+    **The attributes drift.** `NOBYPASSRLS` is the control that makes row-level
+    security mean anything. If somebody grants `BYPASSRLS` to this role to debug
+    something at 2am, nothing puts it back — and a tenancy test that asserts the
+    policy exists still passes, because the policy does exist and is simply not
+    being applied to that role. Re-asserting on every migration makes the drift
+    self-healing rather than permanent.
+
+    `ALTER ROLE` is not destructive: it changes no data and no schema.
+    """
+    return (
+        "DO $$ BEGIN "  # noqa: S608
+        f"IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN "
+        f"CREATE ROLE {role} LOGIN PASSWORD '{password}' "
+        "NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS; "
+        "ELSE "
+        f"ALTER ROLE {role} WITH LOGIN PASSWORD '{password}' "
+        "NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS; "
+        "END IF; END $$;"
+    )
+
+
 def create_roles(app_password: str) -> list[str]:
     """Create the application role. NOBYPASSRLS is the whole point.
 
@@ -83,13 +117,7 @@ def create_roles(app_password: str) -> list[str]:
             "application role password must be 8-128 chars of [A-Za-z0-9_.-]; "
             "it is interpolated into DDL and must not be able to escape the literal"
         )
-    create_role = (
-        "DO $$ BEGIN "  # noqa: S608
-        f"IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{APP_ROLE}') THEN "
-        f"CREATE ROLE {APP_ROLE} LOGIN PASSWORD '{app_password}' "
-        "NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS; "
-        "END IF; END $$;"
-    )
+    create_role = _create_or_reassert(APP_ROLE, app_password)
     # Create first, then grant. The other order only appears to work against a
     # cluster where the role already exists — which is every cluster a migration
     # has ever been run against twice, and no cluster on its first deploy.
@@ -103,13 +131,7 @@ def create_auth_role(password: str) -> list[str]:
             "identity role password must be 8-128 chars of [A-Za-z0-9_.-]; "
             "it is interpolated into DDL and must not be able to escape the literal"
         )
-    create_role = (
-        "DO $$ BEGIN "  # noqa: S608
-        f"IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{AUTH_ROLE}') THEN "
-        f"CREATE ROLE {AUTH_ROLE} LOGIN PASSWORD '{password}' "
-        "NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS; "
-        "END IF; END $$;"
-    )
+    create_role = _create_or_reassert(AUTH_ROLE, password)
     return [create_role, f"GRANT USAGE ON SCHEMA public TO {AUTH_ROLE};"]
 
 

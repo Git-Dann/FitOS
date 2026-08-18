@@ -28,6 +28,13 @@ alter policies.
 | `FITOS_APP_ROLE_PASSWORD` | yes | Password for the `fitos_app` role, created by migration 0001. There is **no default**: a default here becomes a production credential. Must match `[A-Za-z0-9_.-]{8,128}` — it is interpolated into DDL, which cannot take a bound parameter, so it is validated to make sure it cannot escape the literal. |
 | `FITOS_AUTH_ROLE_PASSWORD` | yes | Same, for the `fitos_auth` role created by migration 0004. |
 
+Both role passwords are **re-asserted on every migration**, not only when the role is first
+created. Creating the role only when absent is the obvious shape and it is wrong on any cluster
+the migration has run against before: the role keeps whatever password it was first given, the
+migration reports success, and the application then cannot authenticate. The same statement
+re-asserts `NOBYPASSRLS`, so a role that was granted `BYPASSRLS` out of band has it taken back
+at the next migration rather than permanently voiding every RLS policy.
+
 ## Identity — `apps/web`
 
 | Variable | Required | Default | Notes |
