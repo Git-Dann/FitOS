@@ -1,0 +1,60 @@
+{
+  "candidates": [
+    {
+      "confidence_band": "high",
+      "confidence_score": 0.905,
+      "exposure": [
+        5550,
+        8140,
+        11470
+      ],
+      "fingerprint": "2c776a1c0426e47c8d2c2b9cf2d8b4b8f8dc1e694d73acbb05fb499df6c9f65e",
+      "gap_type": "stock_truth_mismatch",
+      "reason_codes": [
+        "modelled_exposure",
+        "source_disagreement"
+      ],
+      "scope_id": "store-critical",
+      "severity": "critical"
+    },
+    {
+      "confidence_band": "high",
+      "confidence_score": 0.949,
+      "exposure": [
+        13200,
+        19360,
+        27280
+      ],
+      "fingerprint": "63349ea6a41fb556ce0e22950a439e40b68fcb85774c2f04a8afb0ca4cd4b42b",
+      "gap_type": "stock_truth_mismatch",
+      "reason_codes": [
+        "modelled_exposure",
+        "source_disagreement"
+      ],
+      "scope_id": "store-high",
+      "severity": "high"
+    },
+    {
+      "confidence_band": "high",
+      "confidence_score": 0.982,
+      "exposure": [
+        1800,
+        2640,
+        3720
+      ],
+      "fingerprint": "ed75a44baf8de43fc5bb1214ae1778af32fdc176fd89ec1c21f5a321bd6168ae",
+      "gap_type": "stock_truth_mismatch",
+      "reason_codes": [
+        "modelled_exposure",
+        "source_disagreement"
+      ],
+      "scope_id": "store-medium",
+      "severity": "medium"
+    }
+  ],
+  "config_fingerprint": "e8946d9faaeb0f0cb2a016212dc01b4eee4390ebfa4ac26c768f98e876a66e6e",
+  "detector": "source_mismatch",
+  "errors": [],
+  "insufficient_readings": 1,
+  "readings_considered": 5
+}

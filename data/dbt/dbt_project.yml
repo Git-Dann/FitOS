@@ -1,0 +1,21 @@
+# The governed layer. Metric values come from here and nowhere else.
+#
+# `materialized: view` for the governed models on purpose: a materialised table
+# would answer from a snapshot, and "the number changed and nobody knows when"
+# is the failure this whole layer exists to prevent. Incremental materialisation
+# arrives with profiling evidence, not before.
+name: fitos
+version: "1.0.0"
+config-version: 2
+profile: fitos
+
+model-paths: ["models"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  fitos:
+    +materialized: view
+    governed:
+      +schema: governed

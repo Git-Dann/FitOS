@@ -1,0 +1,15 @@
+[project]
+name = "fitos-connector-rest"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = ["fitos-connector-sdk", "pydantic>=2.10"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fitos_connector_rest"]
+
+[tool.uv.sources]
+fitos-connector-sdk = { workspace = true }

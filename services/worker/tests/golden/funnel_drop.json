@@ -1,0 +1,43 @@
+{
+  "candidates": [
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": [
+        2655000,
+        2655000,
+        2655000
+      ],
+      "fingerprint": "c0b05a571ef7e7837c058414f3b155f27dfeeab442922f6dc0e3f2a834f9ee74",
+      "gap_type": "purchase_funnel_drop",
+      "reason_codes": [
+        "funnel_step_below_threshold",
+        "stage_order"
+      ],
+      "scope_id": "store-checkout-broken",
+      "severity": "critical"
+    },
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": [
+        8550000,
+        8550000,
+        8550000
+      ],
+      "fingerprint": "e29c0d74e35b4a7279a6ecc728b865a28a25ecbfc1af7937a5876939af5c7fbf",
+      "gap_type": "purchase_funnel_drop",
+      "reason_codes": [
+        "funnel_step_below_threshold",
+        "stage_product_view"
+      ],
+      "scope_id": "store-top-of-funnel",
+      "severity": "medium"
+    }
+  ],
+  "config_fingerprint": "e714868be2dd8d0410af44b6bad829419ad70494a3f5d071fc863b0758a71a82",
+  "detector": "funnel_drop",
+  "errors": [],
+  "insufficient_readings": 0,
+  "readings_considered": 3
+}

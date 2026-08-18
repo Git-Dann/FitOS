@@ -1,0 +1,47 @@
+{
+  "candidates": [
+    {
+      "confidence_band": "medium",
+      "confidence_score": 0.829,
+      "exposure": [
+        173,
+        346,
+        605
+      ],
+      "fingerprint": "da5da1a4fbd7939248038e046037d33c5452508e944b72e73665cd019a0d76b9",
+      "gap_type": "campaign_below_baseline",
+      "reason_codes": [
+        "attribution_below_baseline",
+        "attribution_limited",
+        "method_last_touch",
+        "modelled_exposure"
+      ],
+      "scope_id": "campaign-poor",
+      "severity": "high"
+    },
+    {
+      "confidence_band": "medium",
+      "confidence_score": 0.829,
+      "exposure": [
+        68,
+        137,
+        239
+      ],
+      "fingerprint": "e2d613b233c55116e5cdfaeb012ed108ecf1f6d8b12a1bb149a022cfb5da1198",
+      "gap_type": "campaign_below_baseline",
+      "reason_codes": [
+        "attribution_below_baseline",
+        "attribution_limited",
+        "method_last_touch",
+        "modelled_exposure"
+      ],
+      "scope_id": "campaign-soft",
+      "severity": "medium"
+    }
+  ],
+  "config_fingerprint": "5b62ddc80f0309b5ba82bd6191f6f52043b600b0be517b88e696059a6eb8c8ad",
+  "detector": "attribution_comparison",
+  "errors": [],
+  "insufficient_readings": 0,
+  "readings_considered": 3
+}

@@ -1,0 +1,45 @@
+{
+  "candidates": [
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": null,
+      "fingerprint": "c6bf63d1c2726d55ed8a5535ad5204101af06094e8158b5c41b9a81af20ae7a0",
+      "gap_type": "schema_drift",
+      "reason_codes": [
+        "new_field"
+      ],
+      "scope_id": "feed-orders",
+      "severity": "low"
+    },
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": null,
+      "fingerprint": "6dca0c31bee48a724ed5844e05621959d1668fe76555b3eb68d5c375f6f65894",
+      "gap_type": "schema_drift",
+      "reason_codes": [
+        "type_change"
+      ],
+      "scope_id": "feed-orders",
+      "severity": "high"
+    },
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": null,
+      "fingerprint": "1c3676dbff43ec22960304fd520d3fd55f9f76a6964eca3f041868a0205655f3",
+      "gap_type": "schema_drift",
+      "reason_codes": [
+        "removed_field"
+      ],
+      "scope_id": "feed-orders",
+      "severity": "critical"
+    }
+  ],
+  "config_fingerprint": "465abd3d75405a73212a94a0eb39b4e22fbf6ddac0d65f0c272ebdcf5d6fe330",
+  "detector": "schema_drift",
+  "errors": [],
+  "insufficient_readings": 0,
+  "readings_considered": 4
+}

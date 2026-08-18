@@ -1,0 +1,43 @@
+{
+  "candidates": [
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": [
+        30000,
+        30000,
+        30000
+      ],
+      "fingerprint": "897745e4c13e033e129c03ae5fe9435ded52ce9ef7dbd1b8d23a63f5e585f369",
+      "gap_type": "margin_leakage",
+      "reason_codes": [
+        "margin_below_prior_period",
+        "revenue_flat_margin_down"
+      ],
+      "scope_id": "variant-cost-creep",
+      "severity": "medium"
+    },
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": [
+        96000,
+        96000,
+        96000
+      ],
+      "fingerprint": "1a47298e68962f69890c7925940287cdd71ae5f4eddb133830ae4e86fb20aae3",
+      "gap_type": "margin_leakage",
+      "reason_codes": [
+        "margin_below_prior_period",
+        "revenue_up_margin_down"
+      ],
+      "scope_id": "variant-leaking",
+      "severity": "high"
+    }
+  ],
+  "config_fingerprint": "26023d6068aa0c1466329da53fb868708b70166e818676f41347ec36cdb9c5a1",
+  "detector": "financial_leakage",
+  "errors": [],
+  "insufficient_readings": 0,
+  "readings_considered": 4
+}

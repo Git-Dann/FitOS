@@ -1,0 +1,22 @@
+[project]
+# The retail pack. A versioned bundle of detector configurations, copy and
+# playbook ids for one domain.
+#
+# It exists as a separate package so the contract in docs/product-spec.md §5 is
+# structural rather than a convention: the core must not name "retail" anywhere
+# outside here, and a detector class that hard-codes one domain's vocabulary is
+# a class the second pack has to fork.
+name = "fitos-pack-retail"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = ["fitos-worker"]
+
+[tool.uv.sources]
+fitos-worker = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fitos_pack_retail"]

@@ -1,0 +1,21 @@
+[project]
+# The data contracts as an installable package.
+#
+# `canonical` and `metrics` are contracts, not scripts: the worker's detectors
+# resolve metric definitions from `metrics.contract` at runtime, and a detector
+# that recorded a metric version it could not resolve would produce evidence
+# nobody can follow. Reaching them through a pytest `pythonpath` entry worked
+# for the tests and would have failed the moment a worker process started
+# outside pytest, which is exactly the kind of gap that surfaces in production
+# rather than in CI.
+name = "fitos-data"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.9", "PyYAML>=6.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["canonical", "metrics"]

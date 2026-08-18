@@ -1,0 +1,43 @@
+{
+  "candidates": [
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": [
+        170000,
+        170000,
+        170000
+      ],
+      "fingerprint": "5c528a0924d8089d95e7389a74bd6d2272d7123013cf816db8504ba5f38ec6f0",
+      "gap_type": "conversion_below_band",
+      "reason_codes": [
+        "modelled_exposure",
+        "ratio_below_band"
+      ],
+      "scope_id": "store-below",
+      "severity": "medium"
+    },
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": [
+        213750,
+        213750,
+        213750
+      ],
+      "fingerprint": "95decbe6a5bc1f6221b1e8d62d7e37ea41ed37c7fe1963f0fdce8c48c0eebe1d",
+      "gap_type": "conversion_below_band",
+      "reason_codes": [
+        "modelled_exposure",
+        "ratio_below_band"
+      ],
+      "scope_id": "store-far-below",
+      "severity": "critical"
+    }
+  ],
+  "config_fingerprint": "56b14e64751790789c8165c060d980a6e165b48d8ded59f5e718bc96b58a42b0",
+  "detector": "ratio_threshold",
+  "errors": [],
+  "insufficient_readings": 0,
+  "readings_considered": 4
+}

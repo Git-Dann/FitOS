@@ -1,0 +1,24 @@
+version: 2
+
+sources:
+  - name: canonical
+    # Configurable rather than hard-coded, so the project can be pointed at a
+    # scratch database. A fixed schema also makes "did the apply step run before
+    # dbt" impossible to test, which is how the ordering bug in CI survived
+    # local verification.
+    schema: "{{ env_var('FITOS_CLICKHOUSE_DB', 'fitos') }}"
+    description: >
+      The canonical layer, written by connector runs. dbt reads it and never
+      writes to it: corrections happen forward through a new mapping version and
+      a re-run, so a model that could UPDATE a fact would be a second, silent way
+      to change history.
+    tables:
+      - name: fact_transaction
+      - name: fact_transaction_line
+      - name: fact_inventory_snapshot
+      - name: fact_stock_check
+      - name: fact_footfall_observation
+      - name: fact_service_request
+      - name: quarantine_record
+      - name: dim_location
+      - name: dim_product_variant

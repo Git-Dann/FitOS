@@ -1,0 +1,147 @@
+# Local development infrastructure for FitOS Gap Intelligence.
+#
+# Started with `pnpm dev:infra`, which waits for every service to report
+# healthy before returning. Application services (apps/web, services/api,
+# services/worker) run on the host against these — they are not containerised
+# for local development, so a code change does not need an image rebuild.
+#
+# Versions are pinned deliberately. ADR 0004 records that the
+# Cube x ClickHouse x dbt-clickhouse combination is a compatibility matrix
+# that must be pinned and tested rather than floated.
+
+name: fitos
+
+services:
+  postgres:
+    image: postgres:17.2-alpine
+    environment:
+      POSTGRES_USER: fitos
+      POSTGRES_PASSWORD: fitos_local_only
+      POSTGRES_DB: fitos
+    ports: ["5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitos -d fitos"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Temporal keeps its own database. Sharing the control-plane database
+  # would couple our migrations to Temporal's schema.
+  postgres_temporal:
+    image: postgres:17.2-alpine
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal_local_only
+      POSTGRES_DB: temporal
+    volumes: ["temporal_db_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    environment:
+      CLICKHOUSE_USER: fitos
+      CLICKHOUSE_PASSWORD: fitos_local_only
+      CLICKHOUSE_DB: fitos
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports: ["8123:8123", "9000:9000"]
+    volumes: ["clickhouse_data:/var/lib/clickhouse"]
+    # ClickHouse recommends a high file-descriptor limit; 262144 is the value
+    # for a real host. A container cannot raise its own hard limit, so on a
+    # constrained host (a CI runner, or a nested container) the daemon refuses
+    # to start the container at all — "error setting rlimit type 7". dev-infra.sh
+    # reads the host's hard limit and exports this variable, clamping when it
+    # has to and saying so.
+    ulimits:
+      nofile:
+        soft: ${FITOS_CLICKHOUSE_NOFILE:-262144}
+        hard: ${FITOS_CLICKHOUSE_NOFILE:-262144}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: fitos
+      MINIO_ROOT_PASSWORD: fitos_local_only
+    ports: ["9002:9000", "9001:9001"]
+    volumes: ["minio_data:/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    depends_on:
+      postgres_temporal: { condition: service_healthy }
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal_local_only
+      POSTGRES_SEEDS: postgres_temporal
+    ports: ["7233:7233"]
+    healthcheck:
+      # `temporal:7233`, not `127.0.0.1:7233`. The frontend binds the container's
+      # network address rather than loopback, so the loopback form is refused and
+      # the service never reports healthy even while it is serving perfectly —
+      # which then blocks temporal_ui on a dependency that is actually fine.
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  temporal_ui:
+    image: temporalio/ui:2.32.0
+    depends_on:
+      temporal: { condition: service_healthy }
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports: ["8233:8080"]
+
+  cube:
+    image: cubejs/cube:v1.1.7
+    depends_on:
+      clickhouse: { condition: service_healthy }
+    environment:
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_DB_TYPE: clickhouse
+      CUBEJS_DB_HOST: clickhouse
+      CUBEJS_DB_PORT: "8123"
+      CUBEJS_DB_NAME: fitos
+      CUBEJS_DB_USER: fitos
+      CUBEJS_DB_PASS: fitos_local_only
+      CUBEJS_API_SECRET: cube_local_only_not_a_real_secret
+    ports: ["4000:4000"]
+    volumes: ["../../services/semantic:/cube/conf"]
+    healthcheck:
+      # The Cube image has no wget and no curl, so a wget probe exits 127 and the
+      # container is permanently unhealthy for want of a binary rather than for
+      # any reason to do with Cube. It does have node.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres_data:
+  temporal_db_data:
+  clickhouse_data:
+  minio_data:

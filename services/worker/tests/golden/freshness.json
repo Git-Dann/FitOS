@@ -1,0 +1,33 @@
+{
+  "candidates": [
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": null,
+      "fingerprint": "b016d6b22eee69ed7bd31695c155649d05fb2924b2535ffb6872632b2e6984e4",
+      "gap_type": "source_freshness_breach",
+      "reason_codes": [
+        "source_late"
+      ],
+      "scope_id": "feed-late",
+      "severity": "high"
+    },
+    {
+      "confidence_band": "high",
+      "confidence_score": 1.0,
+      "exposure": null,
+      "fingerprint": "b942e58055aa2caf70c1e139a374d56369c4c25065022b6660d44e218c676f27",
+      "gap_type": "source_freshness_breach",
+      "reason_codes": [
+        "source_late"
+      ],
+      "scope_id": "feed-very-late",
+      "severity": "critical"
+    }
+  ],
+  "config_fingerprint": "b149f73f16ddf754f168a1e77b9b895c90c70f2958636f236b6ae5d46474c490",
+  "detector": "source_freshness",
+  "errors": [],
+  "insufficient_readings": 0,
+  "readings_considered": 4
+}

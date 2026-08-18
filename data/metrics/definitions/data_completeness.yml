@@ -1,0 +1,30 @@
+key: data_completeness
+name: Data completeness
+description: >
+  Accepted records as a share of all records a source delivered in the window, rejected
+  included. A first-class metric rather than an operational statistic, because that is
+  what lets a data-quality gap suppress a business gap through the same machinery.
+owner: platform
+version: 1
+
+grain: [organization_id, source_key]
+measure_expression: >
+  sum(accepted_records) / nullIf(sum(total_records), 0)
+dimensions: [source_key, day]
+allowed_filters: [source_key, day]
+source_models: [gov_data_quality]
+
+unit: ratio
+currency_policy: not_applicable
+null_policy: exclude_null_denominator
+
+valid_from: 2026-01-01
+valid_to: null
+
+sensitivity: internal
+quality_tests: [not_null, between_0_and_1]
+
+examples:
+  - filters: { source_key: "csv_upload" }
+    expected: 1.0
+    tolerance: 0.0001

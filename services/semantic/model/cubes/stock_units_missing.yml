@@ -1,0 +1,36 @@
+# GENERATED FILE — do not edit.
+#
+# Produced from data/metrics/definitions/stock_units_missing.yml by data/metrics/compile.py.
+# Edit the definition and run `pnpm metrics:compile`. A hand-edit here is
+# reverted the next time anyone runs it, silently.
+
+cubes:
+  - name: stock_units_missing
+    sql_table: gov_stock_truth
+    description: >
+      Total units the system believed were present but a person could not find. Counts only positive discrepancies: a surplus is a different problem with a different cause, and netting the two against each other hides both.
+
+    measures:
+      stock_units_missing:
+        type: number
+        sql: "sum(if(discrepancy > 0, discrepancy, 0))"
+        description: "Total units the system believed were present but a person could not find. Counts only positive discrepancies: a surplus is a different problem with a different cause, and netting the two against each other hides both."
+        meta:
+          metric_version: 1
+          unit: count
+          certified: true
+          exposure_bearing: false
+
+    dimensions:
+      organization_id:
+        type: string
+        sql: organization_id
+        # Never selectable. The tenant filter is applied for the caller; being
+        # able to group by it is how one tenant learns another exists.
+        public: false
+      location_id:
+        type: string
+        sql: location_id
+      product_variant_id:
+        type: string
+        sql: product_variant_id

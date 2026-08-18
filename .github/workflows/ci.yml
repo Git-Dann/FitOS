@@ -1,0 +1,270 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege. Widen per-job only where a job genuinely needs more.
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22.22.2"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  javascript:
+    name: JS — format, lint, typecheck, unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build --filter @fitos/ui
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:unit
+      - name: Design tokens meet WCAG 2.2 AA in both themes
+        run: pnpm test:tokens
+
+  python:
+    name: Python — lint, typecheck, unit
+    runs-on: ubuntu-latest
+    services:
+      # Tenancy tests need real PostgreSQL. RLS cannot be exercised against a
+      # mock, and an untested RLS policy is worth nothing.
+      postgres:
+        image: postgres:17.2-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      FITOS_TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/postgres
+      # Turns a skipped tenancy test into a failure. Without this, a postgres
+      # service that fails to start produces a green build with tenancy
+      # unverified — which is worse than a red one.
+      FITOS_REQUIRE_DB_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --frozen
+      - run: uv run ruff check services
+      - run: uv run ruff format --check services
+      - name: Capabilities, not roles (CLAUDE.md)
+        run: uv run python services/api/tools/check_no_role_comparisons.py services
+      - run: uv run mypy services
+      - run: uv run pytest -q -m "not integration"
+
+  identity:
+    name: JWKS contract (Node issues, Python verifies)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.2-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      FITOS_TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/postgres
+      # This is the only test that crosses the runtime boundary, so a skip here
+      # means the auth path is unverified end to end. Turn the skip into a
+      # failure: a missing Node install must not read as a passing contract.
+      FITOS_REQUIRE_JWKS_CONTRACT: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --all-packages --frozen
+      - run: uv run pytest services/api/tests/test_jwks_contract.py -q
+
+  canonical:
+    name: Canonical contract (ClickHouse)
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8-alpine
+        env:
+          CLICKHOUSE_USER: fitos
+          CLICKHOUSE_PASSWORD: fitos_local_only
+          CLICKHOUSE_DB: fitos
+        ports: ["8123:8123"]
+        options: >-
+          --health-cmd "wget --spider -q http://127.0.0.1:8123/ping"
+          --health-interval 5s --health-timeout 3s --health-retries 30
+    env:
+      FITOS_CLICKHOUSE_URL: http://127.0.0.1:8123/
+      # The physical rules are the difference between a warehouse that answers
+      # in milliseconds and one that answers eventually, and none of them can be
+      # checked without a server. A skip here would read as a passing contract.
+      FITOS_REQUIRE_CLICKHOUSE: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --frozen
+      - name: Apply the canonical schema
+        # Before dbt, because dbt reads these tables as sources. The first
+        # version of this job let a pytest fixture create them, which works
+        # where the schema already exists and fails on a fresh server.
+        run: uv run python -m canonical.apply
+        env:
+          PYTHONPATH: data
+      - name: dbt build (models and their tests)
+        run: uv run dbt build --no-use-colors
+        working-directory: data/dbt
+        env:
+          DBT_PROFILES_DIR: .
+      - run: uv run pytest data -q
+
+  workflows:
+    name: Temporal workflows (determinism + live)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.2-alpine
+        env:
+          POSTGRES_USER: temporal
+          POSTGRES_PASSWORD: temporal_local_only
+          POSTGRES_DB: temporal
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U temporal"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      temporal:
+        image: temporalio/auto-setup:1.25.2
+        env:
+          DB: postgres12
+          DB_PORT: "5432"
+          POSTGRES_USER: temporal
+          POSTGRES_PWD: temporal_local_only
+          POSTGRES_SEEDS: postgres
+        ports: ["7233:7233"]
+    env:
+      FITOS_TEMPORAL_TARGET: 127.0.0.1:7233
+      # A workflow that type-checks can still deadlock or mishandle a child
+      # failure. A skip here would read as a passing engine.
+      FITOS_REQUIRE_TEMPORAL: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --frozen
+      - name: Wait for Temporal
+        run: |
+          for i in $(seq 1 60); do
+            if (echo > /dev/tcp/127.0.0.1/7233) 2>/dev/null; then echo ready; exit 0; fi
+            sleep 2
+          done
+          echo "Temporal did not become reachable" >&2
+          exit 1
+      - run: uv run pytest services/worker/tests/test_workflows.py -q
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  legacy:
+    name: Legacy prototype (preserved, not maintained)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legacy/fitos-prototype
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # setup-node@v5 enables package-manager caching by default and
+          # auto-detects the manager from the repository root, which is pnpm.
+          # This job is the one place that uses npm — the legacy tree keeps its
+          # own package-lock.json outside the workspace — and it never installs
+          # pnpm, so the auto-detection fails the job before any step runs.
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run test:rules
+      - run: npm test
+
+  supply-chain:
+    name: Dependency audit and secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # gitleaks scans history
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Audit platform dependencies (gating)
+        # This gate caught three high-severity advisories on its first run
+        # (next, postcss, sharp). They were fixed by upgrading and by pinning
+        # transitive versions in package.json pnpm.overrides — not by lowering
+        # the threshold. Keep it at high.
+        run: pnpm audit --audit-level high
+      - name: Audit legacy dependencies (reported, not gating)
+        # Recorded, dated exception — docs/spec-review.md T4. The legacy tree
+        # keeps its own lockfile outside the workspace, so its ~16 high-severity
+        # Cloudflare-toolchain advisories are not in the platform graph. They are
+        # reported here rather than hidden. Revisit if legacy ever ships to a host.
+        continue-on-error: true
+        working-directory: legacy/fitos-prototype
+        run: npm audit --audit-level high
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  visual-regression:
+    name: Visual regression (activates in Phase E)
+    runs-on: ubuntu-latest
+    # Deliberately skipped, not stubbed green. No route exists before Phase E,
+    # so there are no approved baselines to compare against — and a green check
+    # for a job with no baselines is worse than no check at all
+    # (docs/spec-review.md T2). Remove this guard when Phase E adds baselines.
+    if: ${{ false }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: pnpm test:visual
