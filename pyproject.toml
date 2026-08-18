@@ -15,6 +15,10 @@ dev-dependencies = [
   "httpx>=0.28",
   "ruff>=0.8",
   "mypy>=1.13",
+  # dbt is a development and CI dependency, not a runtime one: the governed
+  # models are built by a pipeline, never by the API or the worker.
+  "dbt-core>=1.9",
+  "dbt-clickhouse>=1.8",
 ]
 
 [tool.ruff]

@@ -32,7 +32,9 @@
     "demo:reset": "echo 'demo:reset — added in Phase F' && exit 1",
     "demo:snapshot": "echo 'demo:snapshot — added in Phase F' && exit 1",
     "demo:purge": "echo 'demo:purge — added in Phase F' && exit 1",
-    "demo:verify": "echo 'demo:verify — added in Phase F' && exit 1"
+    "demo:verify": "echo 'demo:verify — added in Phase F' && exit 1",
+    "dbt:build": "cd data/dbt && DBT_PROFILES_DIR=. uv run dbt build",
+    "dbt:test": "cd data/dbt && DBT_PROFILES_DIR=. uv run dbt test"
   },
   "devDependencies": {
     "prettier": "3.6.2",

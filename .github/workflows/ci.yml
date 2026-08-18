@@ -132,6 +132,11 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --all-packages --frozen
+      - name: dbt build (models and their tests)
+        run: uv run dbt build --no-use-colors
+        working-directory: data/dbt
+        env:
+          DBT_PROFILES_DIR: .
       - run: uv run pytest data -q
 
   workflows:

@@ -1,0 +1,20 @@
+version: 2
+
+sources:
+  - name: canonical
+    schema: fitos
+    description: >
+      The canonical layer, written by connector runs. dbt reads it and never
+      writes to it: corrections happen forward through a new mapping version and
+      a re-run, so a model that could UPDATE a fact would be a second, silent way
+      to change history.
+    tables:
+      - name: fact_transaction
+      - name: fact_transaction_line
+      - name: fact_inventory_snapshot
+      - name: fact_stock_check
+      - name: fact_footfall_observation
+      - name: fact_service_request
+      - name: quarantine_record
+      - name: dim_location
+      - name: dim_product_variant

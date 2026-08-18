@@ -47,3 +47,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# Cube writes its RocksDB state into the mounted conf directory at runtime.
+# It is a container's working data, not source, and it was committed by an
+# over-broad `git add` the first time Compose was started.
+services/semantic/.cubestore/

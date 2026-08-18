@@ -1,0 +1,60 @@
+version: 2
+
+models:
+  - name: gov_transactions
+    description: >
+      Deduplicated transactions. The `final` in the model is what collapses a
+      replay; without it a re-ingested record is visible twice until a
+      background merge happens to run.
+    columns:
+      - name: organization_id
+        description: Tenant. Injected by the governed query layer, never by a caller.
+        tests: [not_null]
+      - name: transaction_id
+        tests: [not_null]
+      - name: amount_minor
+        description: Minor units, never a float.
+        tests:
+          - not_null
+      - name: currency
+        tests:
+          - not_null
+      - name: lineage_ref
+        description: >
+          Points at the raw object. A row that cannot say where it came from
+          cannot be evidence, and a gap without evidence is not allowed.
+        tests: [not_null]
+      - name: mapping_version
+        tests: [not_null]
+
+  - name: gov_stock_truth
+    description: >
+      System belief against observed count. The join takes the most recent
+      snapshot at or before the check, so a later snapshot cannot make a correct
+      count look wrong.
+    columns:
+      - name: organization_id
+        tests: [not_null]
+      - name: check_id
+        tests: [not_null, unique]
+      - name: observed_quantity
+        tests: [not_null]
+      - name: discrepancy_rate
+        description: >
+          Null when there is no snapshot to compare against, or the snapshot is
+          zero. Zero would read as "no discrepancy" and hide every variant the
+          inventory feed has never covered.
+
+  - name: gov_data_quality
+    description: >
+      Completeness per source per day. A first-class metric, so a data-quality
+      gap can suppress a business gap through the same machinery.
+    columns:
+      - name: organization_id
+        tests: [not_null]
+      - name: completeness
+        description: >
+          Null when nothing arrived. A completeness of 1.0 for a day with no
+          data is the most dangerous number in the system.
+      - name: total_records
+        tests: [not_null]
