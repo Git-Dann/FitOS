@@ -20,7 +20,6 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fitos_api.auth.tokens import TokenError, TokenVerifier
-from fitos_api.capabilities import Capability, Role
 
 ISSUER = "https://fitos.local"
 AUDIENCE = "fitos-api"
@@ -50,8 +49,6 @@ def claims(**overrides: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "sub": str(uuid.uuid4()),
         "org": str(uuid.uuid4()),
-        "mem": str(uuid.uuid4()),
-        "role": "manager",
         "iss": ISSUER,
         "aud": AUDIENCE,
         "iat": now,
@@ -65,11 +62,34 @@ def sign(private: Any, payload: dict[str, Any], algorithm: str = "RS256") -> str
     return jwt.encode(payload, private, algorithm=algorithm)
 
 
-def test_a_valid_token_yields_a_principal(verifier: TokenVerifier, keypair: Any) -> None:
+def test_a_valid_token_yields_the_identity_it_proves(verifier: TokenVerifier, keypair: Any) -> None:
     private, public = keypair
-    principal = verifier.verify_with_key(sign(private, claims()), public)
-    assert principal.role is Role.MANAGER
-    assert principal.can(Capability.GAP_ASSIGN)
+    payload = claims()
+    token = verifier.verify_with_key(sign(private, payload), public)
+
+    assert str(token.user_id) == payload["sub"]
+    assert str(token.organization_id) == payload["org"]
+
+
+def test_role_and_capability_claims_are_not_read_at_all(
+    verifier: TokenVerifier, keypair: Any
+) -> None:
+    """A token cannot describe its own authority (ADR 0009).
+
+    `VerifiedToken` has no role and no capabilities to carry them into, so a
+    forged or stale `role` claim has nowhere to land. What the caller may do is
+    decided by the membership row, which the API reads under RLS on every
+    request; test_api_tenancy proves the claim is ignored end to end.
+    """
+    private, public = keypair
+    token = verifier.verify_with_key(
+        sign(private, claims(role="owner", cap=["gap.view_exposure"], mem=str(uuid.uuid4()))),
+        public,
+    )
+
+    assert not hasattr(token, "role")
+    assert not hasattr(token, "capabilities")
+    assert set(vars(token)) == {"user_id", "organization_id"}
 
 
 def test_alg_none_is_rejected(verifier: TokenVerifier, keypair: Any) -> None:
@@ -158,7 +178,7 @@ def test_a_tampered_payload_is_rejected(verifier: TokenVerifier, keypair: Any) -
         verifier.verify_with_key(f"{header}.{other}.{signature}", public)
 
 
-@pytest.mark.parametrize("missing", ["sub", "org", "mem", "role"])
+@pytest.mark.parametrize("missing", ["sub", "org"])
 def test_a_missing_identity_claim_is_a_refusal_not_a_default(
     verifier: TokenVerifier, keypair: Any, missing: str
 ) -> None:
@@ -169,35 +189,6 @@ def test_a_missing_identity_claim_is_a_refusal_not_a_default(
         verifier.verify_with_key(sign(private, payload), public)
 
 
-def test_an_unknown_role_is_rejected(verifier: TokenVerifier, keypair: Any) -> None:
-    private, public = keypair
-    with pytest.raises(TokenError, match="malformed"):
-        verifier.verify_with_key(sign(private, claims(role="superadmin")), public)
-
-
-def test_an_unknown_capability_grant_is_rejected(verifier: TokenVerifier, keypair: Any) -> None:
-    """A grant the server does not recognise is refused, not ignored.
-
-    Ignoring it would let a stale or crafted token carry claims that mean
-    nothing here but something later.
-    """
-    private, public = keypair
-    with pytest.raises(TokenError, match="unknown capability"):
-        verifier.verify_with_key(sign(private, claims(cap=["gap.delete_everything"])), public)
-
-
-def test_a_granted_capability_extends_the_role(verifier: TokenVerifier, keypair: Any) -> None:
-    """The documented frontline exception, carried as a capability grant."""
-    private, public = keypair
-    plain = verifier.verify_with_key(sign(private, claims(role="frontline")), public)
-    assert not plain.can(Capability.GAP_VIEW_EXPOSURE)
-
-    granted = verifier.verify_with_key(
-        sign(private, claims(role="frontline", cap=["gap.view_exposure"])), public
-    )
-    assert granted.can(Capability.GAP_VIEW_EXPOSURE)
-
-
 def test_the_error_never_contains_the_token(verifier: TokenVerifier, keypair: Any) -> None:
     """docs/threat-model.md T3 — a rejected token must not land in a log."""
     private, public = keypair
@@ -206,3 +197,9 @@ def test_the_error_never_contains_the_token(verifier: TokenVerifier, keypair: An
         verifier.verify_with_key(token, public)
     assert token not in str(exc.value)
     assert token.split(".")[1] not in str(exc.value)
+
+
+def test_a_malformed_organization_claim_is_refused(verifier: TokenVerifier, keypair: Any) -> None:
+    private, public = keypair
+    with pytest.raises(TokenError, match="malformed"):
+        verifier.verify_with_key(sign(private, claims(org="not-a-uuid")), public)

@@ -1,6 +1,6 @@
 # ADR 0005 — Auth provider and the authorisation boundary
 
-Status: accepted · Date: 2026-08-14 · Phase: B
+Status: accepted, amended by [ADR 0009](0009-authorisation-state-is-not-carried-in-the-token.md) · Date: 2026-08-14 · Phase: B
 
 ## Context
 
@@ -23,6 +23,9 @@ reconciliation.
   issuance with a JWKS endpoint. It runs in the Node process alongside `apps/web`.
 - **FastAPI owns authorisation**: it verifies JWTs against JWKS (cached, with rotation), derives
   `organization_id` from verified claims only, and evaluates capabilities.
+  [ADR 0009](0009-authorisation-state-is-not-carried-in-the-token.md) narrows what the token is
+  allowed to say: it carries `sub` and `org` and no authority at all, and role and capabilities are
+  read from the membership row on every request.
 - The `/auth` resource group in the API is **not** a second login implementation. It exposes session
   introspection, capability discovery for the current caller, and the organization switch — the
   things the API must own because they are authorisation, not identity.
