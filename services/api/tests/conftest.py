@@ -20,9 +20,18 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
+import jwt
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi.testclient import TestClient
+from fitos_api.auth.tokens import TokenVerifier
+from fitos_api.main import create_app
 from fitos_api.models import Base
+from fitos_api.settings import Environment, Settings
 from fitos_api.tenancy_sql import APP_ROLE, all_statements
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -141,3 +150,82 @@ def two_orgs(owner_session: Session) -> tuple[uuid.UUID, uuid.UUID]:
     )
     owner_session.commit()
     return org_a.id, org_b.id
+
+
+# ---------------------------------------------------------------------------
+# The authenticated HTTP client
+# ---------------------------------------------------------------------------
+#
+# Six suites had each grown their own copy of this. They are identical, and six
+# copies of a JWT fixture is six places a signature check can be quietly
+# loosened without anybody noticing the others still assert it. New suites take
+# these; the existing local copies shadow them harmlessly and are worth
+# collapsing onto these in a separate change.
+
+ISSUER = "https://fitos.local"
+AUDIENCE = "fitos-api"
+
+
+@pytest.fixture(scope="module")
+def keypair() -> tuple[Any, str]:
+    private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public = (
+        private.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode()
+    )
+    return private, public
+
+
+class _StaticKeyVerifier(TokenVerifier):
+    """Verifies against a fixed public key instead of fetching a JWKS.
+
+    Only key *resolution* is stubbed. Signature, algorithm, issuer, audience and
+    expiry checks all run exactly as in production — stubbing those would make
+    these tests meaningless.
+    """
+
+    def __init__(self, public_key: str) -> None:
+        super().__init__(jwks_url="http://unused.invalid", issuer=ISSUER, audience=AUDIENCE)
+        object.__setattr__(self, "_public_key", public_key)
+
+    def verify(self, token: str):  # type: ignore[no-untyped-def]
+        return self.verify_with_key(token, self._public_key)  # type: ignore[attr-defined]
+
+
+def token_for(private: Any, user_id: uuid.UUID, org_id: uuid.UUID) -> str:
+    """A token proves identity and names an organization. Nothing else.
+
+    There is deliberately no `role` parameter: the caller's authority comes from
+    their membership row (ADR 0009). Tests that need a different role change the
+    membership, which is what production does too.
+    """
+    now = datetime.now(UTC)
+    return jwt.encode(
+        {
+            "sub": str(user_id),
+            "org": str(org_id),
+            "iss": ISSUER,
+            "aud": AUDIENCE,
+            "iat": now,
+            "exp": now + timedelta(minutes=10),
+        },
+        private,
+        algorithm="RS256",
+    )
+
+
+@pytest.fixture
+def client(app_engine: Engine, keypair: Any) -> TestClient:
+    _, public = keypair
+    app = create_app(settings=Settings(environment=Environment.LOCAL))
+    app.state.token_verifier = _StaticKeyVerifier(public)
+    app.state.session_factory = sessionmaker(bind=app_engine, expire_on_commit=False)
+    return TestClient(app)
+
+
+def auth(private: Any, user_id: uuid.UUID, org: uuid.UUID) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token_for(private, user_id, org)}"}

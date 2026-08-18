@@ -52,6 +52,14 @@ TABLE_GRANTS: dict[str, str] = {
     "connector_runs": "SELECT, INSERT, UPDATE",
     "quarantined_records": "SELECT, INSERT, UPDATE",
     "webhook_deliveries": "SELECT, INSERT",
+    # An action can be reassigned, completed or cancelled, so it is mutable.
+    # It is not deletable: cancelling an action records that somebody decided
+    # not to do it, and deleting it records nothing at all.
+    "gap_actions": "SELECT, INSERT, UPDATE",
+    # An outcome is a measurement. "No measurable change" is a first-class
+    # result, and a deletable outcome table turns the ledger into a
+    # success-reporting instrument by making the disappointing ones removable.
+    "gap_outcomes": "SELECT, INSERT",
 }
 
 NO_DELETE_TABLES: tuple[str, ...] = (
@@ -62,6 +70,8 @@ NO_DELETE_TABLES: tuple[str, ...] = (
     "connector_runs",
     "quarantined_records",
     "webhook_deliveries",
+    "gap_actions",
+    "gap_outcomes",
 )
 
 ORG_SCOPED_TABLES: tuple[str, ...] = tuple(TABLE_GRANTS)

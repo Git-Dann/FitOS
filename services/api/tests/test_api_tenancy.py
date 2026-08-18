@@ -467,6 +467,16 @@ def test_every_route_that_touches_tenant_data_is_covered_by_a_cross_tenant_test(
         "/v1/runs",
         "/v1/runs/{run_id}",
         "/v1/runs/backfill",
+        # test_gap_lifecycle.py: list scoping, 404 on read, transition, assign,
+        # action create and list, and outcome record; plus the one field on
+        # these routes that could name another tenant — the assignment owner id,
+        # which is refused rather than stored as an id resolving to nobody.
+        "/v1/gaps",
+        "/v1/gaps/{gap_id}",
+        "/v1/gaps/{gap_id}/assign",
+        "/v1/gaps/{gap_id}/transition",
+        "/v1/gaps/{gap_id}/actions",
+        "/v1/gaps/{gap_id}/outcomes",
     }
     # Routes that deliberately run without a tenant scope, and where the
     # cross-tenant reasoning lives.

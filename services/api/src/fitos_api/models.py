@@ -310,6 +310,22 @@ class Gap(Base):
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     outcome_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
 
+    # Optimistic concurrency for lifecycle changes. Two people triaging the same
+    # gap from a stale list must not silently overwrite each other; the second
+    # gets a conflict and sees what changed. Named `lifecycle_version` rather
+    # than `version` so it is never confused with `metric_version` or
+    # `rule_version`, which pin reproducibility rather than guarding a write.
+    lifecycle_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("1")
+    )
+
+    # A dismissal is how a ledger gets quietly emptied, so it carries both a
+    # countable code and a note somebody has to write. The code makes dismissals
+    # measurable across a pack; the note is what a colleague reads six weeks
+    # later.
+    dismissal_reason_code: Mapped[str | None] = mapped_column(String(32))
+    dismissal_note: Mapped[str | None] = mapped_column(Text)
+
     __table_args__ = (
         CheckConstraint(f"status IN {GAP_STATUSES!r}", name="ck_gap_status"),
         CheckConstraint(f"severity IN {SEVERITIES!r}", name="ck_gap_severity"),
@@ -355,6 +371,15 @@ class Gap(Base):
         CheckConstraint(
             "(status = 'dismissed') = (dismissed_at IS NOT NULL)", name="ck_gap_dismissed_at"
         ),
+        # A dismissal with no stated reason is indistinguishable from a gap that
+        # was quietly deleted, and the database is the only place that can make
+        # the pair inseparable from the status.
+        CheckConstraint(
+            "status <> 'dismissed' OR (dismissal_reason_code IS NOT NULL "
+            "AND dismissal_note IS NOT NULL)",
+            name="ck_gap_dismissal_has_a_reason",
+        ),
+        CheckConstraint("lifecycle_version >= 1", name="ck_gap_lifecycle_version"),
         CheckConstraint(
             "status <> 'resolved' OR outcome_id IS NOT NULL", name="ck_gap_resolved_has_outcome"
         ),
@@ -645,4 +670,105 @@ class WebhookDelivery(Base):
             name="uq_webhook_delivery_once",
         ),
         Index("ix_webhook_deliveries_org_time", "organization_id", "received_at"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Actions and outcomes (Phase D)
+# ---------------------------------------------------------------------------
+
+ACTION_STATUSES = ("open", "in_progress", "done", "cancelled")
+
+# `method` decides whether the product may use causal language about this
+# result. Only `controlled_test` may, and only within its declared design; a
+# `pre_post` outcome is a before-and-after in a world where other things also
+# changed. Constraining the column is what makes that rule enforceable rather
+# than a style note.
+OUTCOME_METHODS = ("observed", "pre_post", "controlled_test")
+
+
+class GapAction(Base):
+    """Something somebody decided to do about a gap.
+
+    A separate table rather than a column, because a gap can carry several
+    actions and flattening them would force one per gap. `assignee_id` is a
+    membership id, not a user id: the same person in two organizations is two
+    assignees, and a user id would let one organization's assignment reference
+    the other's.
+    """
+
+    __tablename__ = "gap_actions"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    gap_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    playbook_id: Mapped[str | None] = mapped_column(String(120))
+    assignee_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="open")
+
+    created_by: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(f"status IN {ACTION_STATUSES!r}", name="ck_action_status"),
+        CheckConstraint(
+            "(status = 'done') = (completed_at IS NOT NULL)", name="ck_action_completed_at"
+        ),
+        Index("ix_gap_actions_org_gap", "organization_id", "gap_id"),
+    )
+
+
+class GapOutcome(Base):
+    """What actually happened, measured.
+
+    Recorded against a metric definition and version so it can be reproduced,
+    and over an explicit measurement window so "after" means something specific.
+    "No measurable change" is a first-class result and is exactly as easy to
+    record as a positive one — `delta` of zero with `method = observed` is a
+    complete, valid row. The table grants no DELETE for the same reason:
+    a ledger whose disappointing outcomes can be removed is a success-reporting
+    instrument.
+    """
+
+    __tablename__ = "gap_outcomes"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    gap_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    action_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+
+    measurement_window_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    measurement_window_end: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    metric_definition_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    metric_version: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    value_before: Mapped[float] = mapped_column(Numeric, nullable=False)
+    value_after: Mapped[float] = mapped_column(Numeric, nullable=False)
+    delta: Mapped[float] = mapped_column(Numeric, nullable=False)
+    method: Mapped[str] = mapped_column(String(20), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    recorded_by: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(f"method IN {OUTCOME_METHODS!r}", name="ck_outcome_method"),
+        CheckConstraint(
+            "measurement_window_start < measurement_window_end", name="ck_outcome_window_ordered"
+        ),
+        CheckConstraint("metric_version >= 1", name="ck_outcome_metric_version"),
+        Index("ix_gap_outcomes_org_gap", "organization_id", "gap_id"),
     )

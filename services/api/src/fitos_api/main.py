@@ -9,7 +9,7 @@ from fitos_api.auth.tokens import TokenVerifier
 from fitos_api.db import configure, session_factory
 from fitos_api.health import ReadinessRegistry
 from fitos_api.routes import auth as auth_routes
-from fitos_api.routes import ingest, invitations, mappings, memberships, runs
+from fitos_api.routes import gaps, ingest, invitations, mappings, memberships, runs
 from fitos_api.settings import Settings
 
 SERVICE = "api"
@@ -50,6 +50,7 @@ def create_app(
         }
 
     app.include_router(auth_routes.router)
+    app.include_router(gaps.router)
     app.include_router(ingest.router)
     app.include_router(invitations.router)
     app.include_router(mappings.router)
