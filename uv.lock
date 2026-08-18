@@ -14,6 +14,7 @@ members = [
     "fitos-connector-csv",
     "fitos-connector-rest",
     "fitos-connector-sdk",
+    "fitos-data",
     "fitos-worker",
 ]
 
@@ -939,12 +940,28 @@ requires-dist = [
 ]
 
 [[package]]
+name = "fitos-data"
+version = "0.0.0"
+source = { editable = "data" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.9" },
+    { name = "pyyaml", specifier = ">=6.0" },
+]
+
+[[package]]
 name = "fitos-worker"
 version = "0.0.0"
 source = { editable = "services/worker" }
 dependencies = [
     { name = "fitos-connector-csv" },
     { name = "fitos-connector-sdk" },
+    { name = "fitos-data" },
     { name = "temporalio" },
 ]
 
@@ -952,6 +969,7 @@ dependencies = [
 requires-dist = [
     { name = "fitos-connector-csv", editable = "connectors/csv_upload" },
     { name = "fitos-connector-sdk", editable = "connectors/sdk" },
+    { name = "fitos-data", editable = "data" },
     { name = "temporalio", specifier = ">=1.8" },
 ]
 
