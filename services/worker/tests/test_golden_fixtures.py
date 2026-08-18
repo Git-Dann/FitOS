@@ -48,6 +48,10 @@ from fitos_worker.detectors.base import (
     candidate_fingerprint,
     utc,
 )
+from fitos_worker.detectors.baseline_comparison import (
+    BaselineComparisonConfig,
+    BaselineComparisonDetector,
+)
 from fitos_worker.detectors.data_quality import (
     CompletenessConfig,
     CompletenessDetector,
@@ -55,6 +59,11 @@ from fitos_worker.detectors.data_quality import (
     FreshnessDetector,
     SchemaDriftConfig,
     SchemaDriftDetector,
+)
+from fitos_worker.detectors.funnel_drop import (
+    FunnelDropConfig,
+    FunnelDropDetector,
+    FunnelStage,
 )
 from fitos_worker.detectors.ratio_threshold import (
     Direction,
@@ -270,8 +279,105 @@ def _attribution() -> tuple[Detector, list[MetricReading]]:
     return detector, readings
 
 
+def _baseline_comparison() -> tuple[Detector, list[MetricReading]]:
+    detector = BaselineComparisonDetector(
+        BaselineComparisonConfig(
+            rule_id=RULE,
+            version=1,
+            pack_key="test_pack",
+            gap_type="conversion_below_baseline",
+            canonical_entity="fact_transaction",
+            metric_name="Conversion rate",
+            minimum_peer_group=5,
+        )
+    )
+    readings = [
+        MetricReading(
+            metric_key="conversion_rate",
+            metric_version=1,
+            query_hash="golden-baseline",
+            dimensions=(
+                {"location_id": scope, "baseline_value": base} if base else {"location_id": scope}
+            ),
+            value=Decimal(value),
+            denominator=denominator,
+            captured_at=WINDOW.end,
+        )
+        for scope, value, base, denominator in [
+            ("store-typical-a", "0.30", "0.31", 600),
+            ("store-typical-b", "0.29", "0.30", 550),
+            ("store-typical-c", "0.31", "0.30", 700),
+            ("store-typical-d", "0.30", "0.29", 640),
+            ("store-peer-only", "0.14", "", 480),
+            ("store-both", "0.09", "0.28", 520),
+        ]
+    ]
+    return detector, readings
+
+
+def _funnel_drop() -> tuple[Detector, list[MetricReading]]:
+    detector = FunnelDropDetector(
+        FunnelDropConfig(
+            rule_id=RULE,
+            version=1,
+            pack_key="test_pack",
+            gap_type="purchase_funnel_drop",
+            canonical_entity="fact_session",
+            funnel_name="purchase",
+            minimum_observations=0,
+            value_per_conversion_minor=Decimal("4500"),
+            stages=[
+                FunnelStage(key="session", label="Session"),
+                FunnelStage(
+                    key="product_view",
+                    label="Product view",
+                    expected_survival=Decimal("0.40"),
+                    threshold_survival=Decimal("0.30"),
+                ),
+                FunnelStage(
+                    key="basket",
+                    label="Basket",
+                    expected_survival=Decimal("0.25"),
+                    threshold_survival=Decimal("0.18"),
+                ),
+                FunnelStage(
+                    key="order",
+                    label="Order",
+                    expected_survival=Decimal("0.70"),
+                    threshold_survival=Decimal("0.55"),
+                ),
+            ],
+        )
+    )
+    readings = [
+        MetricReading(
+            metric_key="funnel_counts",
+            metric_version=1,
+            query_hash="golden-funnel",
+            dimensions={
+                "location_id": scope,
+                "session": str(counts[0]),
+                "product_view": str(counts[1]),
+                "basket": str(counts[2]),
+                "order": str(counts[3]),
+            },
+            value=None,
+            denominator=counts[0],
+            captured_at=WINDOW.end,
+        )
+        for scope, counts in [
+            ("store-healthy", (10_000, 4200, 1100, 800)),
+            ("store-checkout-broken", (10_000, 4200, 1100, 180)),
+            ("store-top-of-funnel", (10_000, 2100, 540, 400)),
+        ]
+    ]
+    return detector, readings
+
+
 CASES = {
     "attribution": _attribution,
+    "baseline_comparison": _baseline_comparison,
+    "funnel_drop": _funnel_drop,
     "source_mismatch": _source_mismatch,
     "ratio_threshold": _ratio_threshold,
     "freshness": _freshness,
