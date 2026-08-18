@@ -6,37 +6,78 @@ Updated at the end of every session. Read this before starting a phase.
 
 ## current_phase
 
-Phase C — data plane.
+Phase D — semantic and gap engine.
 
 ## status
 
-**Acceptance checks pass. All seven Phase C criteria are met and each is proven by execution.**
+**The vertical slice is closed. The Stock Truth Gap exists end to end and is proven by execution,
+not by reading code.** Eight of the nine Phase D acceptance criteria are met; the ninth — the
+remaining detector classes — is partly done and scoped below.
 
-422 Python tests pass across the API, worker, connectors and canonical layers, plus 19 dbt models
-and tests. `pnpm verify` exits 0 and now includes `test:data`, which used to be a placeholder that
-exited 0 without running anything.
+766 Python tests pass (API 293, worker 252, connectors 129, data 85, packs 7), plus 23 dbt tests.
+`pnpm verify` exits 0. Everything DB-backed runs against real PostgreSQL with
+`FITOS_REQUIRE_DB_TESTS=1`, so a missing dependency fails rather than skips.
 
-Every criterion is checked against a real dependency rather than a mock: PostgreSQL for tenancy,
-ClickHouse for the canonical contract and the governed models, Temporal for the workflows, and a
-real Better Auth instance for the JWKS contract carried over from Phase B. Four new CI jobs carry
-those services with `FITOS_REQUIRE_*` flags, so a missing dependency fails rather than reads as a
-passing check.
+The headline: six days of detector runs over deteriorating stock readings produce **one** evolving
+gap, which is then assigned, actioned and resolved with an outcome through the HTTP API, with the
+audit rows and detector run records to show for it. That is `test_vertical_slice.py`, against a real
+database.
 
-Phases A and B remain complete; their records are below.
+Phases A, B and C remain complete; their records are below.
+
+## what execution found that reading would not
+
+Every one of these was surfaced by running something, and each is now covered by a test that fails
+without the fix.
+
+1. **Migrations left a pre-existing role's password unchanged.** `CREATE ROLE ... IF NOT EXISTS`
+   reports success and leaves the old password in place. 125 API tests failed on `password
+   authentication failed for user "fitos_app"` against a cluster whose roles predated the current
+   configuration. A fresh CI database can never reproduce it; a long-lived one reproduces it once,
+   at the worst time. The same statement now re-asserts `NOBYPASSRLS`, so a role granted
+   `BYPASSRLS` out of band has it taken back at the next migration instead of permanently voiding
+   every RLS policy while the tenancy tests keep passing.
+
+2. **The accessibility override was applied at every capacity instead of only at Red.** A
+   differential check against the prototype over 3,888 input combinations found 456 divergences —
+   while all five ported behavioural tests still passed. This was in the one rule the spec calls
+   non-negotiable.
+
+3. **A golden test that silently rewrote its own expectations.** `FITOS_REGENERATE_GOLDEN` leaked
+   across two commands in one shell; a run that looked like a passing comparison had rewritten the
+   fixture with the output of deliberately broken code. It took three rounds to notice, because a
+   rewriting golden test and a working one produce identical output. Regeneration is now refused
+   when `CI` is set.
+
+4. **A capability test that could not tell two capabilities apart.** The first dismissal test used a
+   frontline role holding neither `gap.transition` nor `gap.dismiss`, so it passed just as happily
+   with dismissal mapped to the wrong one. Replaced with the one caller that discriminates.
+
+5. **Three pack-contract violations in this session's own code**, found by writing the contract test
+   the spec asks for: a `retail.*` playbook id inside a core detector, and two strings naming the
+   fitting room in the fulfilment policy.
+
+6. **A golden fixture that fired on every reading it was given** — so it could not have detected a
+   detector that started firing on everything. Caught by the test asserting each fixture contains a
+   non-firing case.
+
+7. **A writer rule with no test of its own.** `percentage_delta` returning 0.0 instead of NULL at a
+   zero baseline passed the entire vertical slice, because no reading in it has a zero expected
+   value. The candidate and the writer are two implementations of one rule; only one had a test.
 
 ## acceptance
 
 | # | Criterion | Evidence |
 | --- | --- | --- |
-| 1 | The 14-point connector contract suite passes for both connectors | `contract_tests.py`, inherited by both. 43 CSV + 54 REST tests |
-| 2 | Idempotency: the same extract twice yields the same canonical row count | Proven three times — identical record *ids* per connector, identical staging rows per run, and a re-ingested row collapsing to one under `FINAL` in ClickHouse |
-| 3 | Duplicate webhook: the same signed delivery twice yields one canonical fact | `test_the_same_delivery_twice_is_accepted_once`, over HTTP, with the row count asserted |
-| 4 | SSRF: private, loopback, link-local and redirect-to-private all refused | 38 egress tests plus connector-level refusals. Release gate |
-| 5 | A mapping version can be created, previewed, backfilled, compared and rolled back through the API | `test_mappings.py` (25) and `test_runs.py` (14) |
-| 6 | A malformed record is quarantined with its reason and mapping version, the run completes, counts are never silent | `test_runner.py`, including `read == written + quarantined` for every fixture |
-| 7 | dbt tests pass; canonical contract tests pass | 19 dbt, 53 canonical, 6 governed-model — all against live ClickHouse |
-| 8 | Worker restart mid-backfill resumes from checkpoint without duplicating rows | `test_a_restart_resumes_from_the_checkpoint_without_duplicating` |
-| 9 | Threat-model review for the ingestion boundary recorded | [threat-model-review-phase-c.md](threat-model-review-phase-c.md) — and it found two gaps |
+| 1 | A certified metric returns the same value through Cube, the API and a dbt test | `data/metrics/` — one definition compiles to all three. 26 metric-contract tests |
+| 2 | Metric golden tests pass; the `examples` block executes | Executed against seeded ClickHouse, not asserted as documentation |
+| 3 | Detector golden fixtures pass, including the five legacy behavioural cases with the accessibility override intact | `test_golden_fixtures.py` (5 classes) and `test_fulfilment.py` (39, incl. a 3,888-case differential grid against the prototype) |
+| 4 | Scenario 2 produces **one** evolving gap across six days, not one per day | `test_vertical_slice.py` against real PostgreSQL, plus `test_detector_pipeline.py` in memory. Including the window in the dedupe key fails 8 of 9 slice stages |
+| 5 | Every created gap satisfies the aggregate invariants; a property test asserts no gap without metric version, detector version, evidence and as-of time, and no exposure without low/base/high, assumptions and confidence | `test_gap_invariants.py` — enforced as database constraints, so no code path can bypass them |
+| 6 | A gap can be assigned, actioned and resolved with an outcome through the API, with audit rows | `test_vertical_slice.py` asserts the full six-row audit trail in order |
+| 7 | A detector run record captures versions, query hash, window, thresholds, candidates, suppressions, dedupe decisions, duration and errors | `detector_runs` (migration 0007). Written on every run, including ones that found nothing or failed |
+| 8 | Exposure fields are absent from a `frontline` token's payload | Absent, not null and not zero. Two tests: one on the keys, one on the raw response text so a renamed or nested copy fails too |
+| 9 | The twelve detector classes | **Partial — 5 of 12.** Scoped below |
 
 ## completed_outcomes
 
@@ -387,6 +428,22 @@ given one for.
 | 2 | A — repository and platform | Monorepo, legacy preserved with history, health probes, tokens as code, Compose, CI skeleton. `pnpm verify` exit 0. Three items unverified for lack of a daemon. |
 | 3 | B — auth and tenancy | RLS proven against real PostgreSQL, ADR 0009, the Gap aggregate, invitations, Better Auth with the JWKS contract tested across runtimes. 132 tests. Seven real bugs found by execution — four in the auth and schema work, three more the moment Compose was started for the first time. |
 | 4 | C — data plane | Connector SDK with the 14-point contract as library code, two Tier 1 connectors, versioned mappings, the run executor, Temporal workflows, the canonical ClickHouse layer, the governed dbt layer and the ingestion boundary. 422 tests plus 19 dbt. Seven more bugs found by execution, and a threat-model review that found two controls the document claimed but the code lacked. |
+
+## Phase D remainder
+
+Five detector classes are implemented: source mismatch, ratio threshold, freshness, completeness and
+schema drift. That is the position [docs/spec-review.md](spec-review.md) T3 records deliberately —
+build the slice completely against the full interface, then add the rest — and the five chosen are
+the ones the slice and the suppression machinery need.
+
+Seven remain: peer/baseline comparison, funnel drop, financial leakage, attribution comparison
+(low confidence by construction), identity match, trend break and staffing ratio. Each is a config
+plus a `detect` method against an interface that already exists; the framework behaviours they share
+— sufficiency refusal, ordering, error isolation, run records — are written and tested once, so a
+new class inherits them rather than reimplementing them.
+
+Two things must accompany each: a golden fixture (the coverage test fails on a class without one)
+and, for any class emitting a data-quality gap type, an entry in the pipeline's suppression set.
 
 ## Open product questions from the fulfilment port (Phase D)
 

@@ -88,7 +88,17 @@ passes 3/3. Do not reformat this tree — it is preserved, not maintained.
 - **No placeholder buttons** on a route marked complete.
 - **No guard without a test that it fails.** A coverage check that finds nothing passes
   everything, and looks exactly like one that works. Phase B shipped a cross-tenant route guard
-  that silently checked nothing for a whole phase.
+  that silently checked nothing for a whole phase, and Phase D shipped a golden test that rewrote
+  its own expectations for three rounds before anyone noticed.
+- **A test that cannot fail for the reason it names is not a test.** Prefer the input that
+  discriminates: a caller holding neither capability cannot tell two capabilities apart, and a
+  fixture in which every case fires cannot detect a detector that fires on everything.
+- **One rule, one implementation — or a test on each.** Where an invariant is genuinely computed
+  twice (a Decimal path and a float path, a candidate and the row it becomes), both need their own
+  test. Covering only one leaves the other free to drift.
+- **Packs own their vocabulary.** No gap type, playbook id, copy string or metric name belongs in
+  core code; `packs/retail/tests/test_pack_contract.py` enforces it. A detector that hard-codes one
+  domain has to be forked for the second.
 
 ## Destructive commands
 
