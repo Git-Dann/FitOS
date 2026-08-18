@@ -1,5 +1,10 @@
 """Applying a mapping version to source records.
 
+Lives in the SDK rather than in either service because both need it and neither
+owns it: the API previews and compares mappings, the worker applies them during
+a run, and the two must agree exactly. A preview computed by different code from
+the run it predicts is a preview that lies at the worst possible moment.
+
 A mapping is data, not code, which is what lets it be versioned, previewed,
 compared and rolled back without a deploy. This module is the interpreter.
 

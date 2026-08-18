@@ -452,6 +452,16 @@ requires-dist = [
 name = "fitos-worker"
 version = "0.0.0"
 source = { editable = "services/worker" }
+dependencies = [
+    { name = "fitos-connector-csv" },
+    { name = "fitos-connector-sdk" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fitos-connector-csv", editable = "connectors/csv_upload" },
+    { name = "fitos-connector-sdk", editable = "connectors/sdk" },
+]
 
 [[package]]
 name = "greenlet"

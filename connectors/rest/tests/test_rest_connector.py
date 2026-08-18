@@ -11,6 +11,7 @@ import hashlib
 import json
 import socket
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -325,7 +326,7 @@ async def test_a_backfill_plan_covers_the_window_exactly_once(
     assert plan.windows[-1].end == datetime(2026, 1, 5, tzinfo=UTC)
     # No gaps and no overlaps — a backfill that misses a day is worse than one
     # that fails, because nothing reports it.
-    for earlier, later in zip(plan.windows, plan.windows[1:], strict=False):
+    for earlier, later in pairwise(plan.windows):
         assert earlier.end == later.start
 
 

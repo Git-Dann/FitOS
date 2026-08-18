@@ -2,7 +2,11 @@
 name = "fitos-worker"
 version = "0.0.0"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["fitos-connector-sdk", "fitos-connector-csv"]
+
+[tool.uv.sources]
+fitos-connector-sdk = { workspace = true }
+fitos-connector-csv = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

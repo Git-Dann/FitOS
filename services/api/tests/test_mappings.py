@@ -21,15 +21,15 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from fitos_api.auth.tokens import TokenVerifier
 from fitos_api.main import create_app
-from fitos_api.mapping import (
+from fitos_api.models import Connection, Membership, User
+from fitos_api.settings import Environment, Settings
+from fitos_connector_sdk.mapping import (
     MappingSpec,
     UnknownTransformError,
     apply_mapping,
     diff_mappings,
     preview,
 )
-from fitos_api.models import Connection, Membership, User
-from fitos_api.settings import Environment, Settings
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 

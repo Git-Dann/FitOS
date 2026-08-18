@@ -24,6 +24,12 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fitos_connector_sdk.mapping import (
+    MappingSpec,
+    UnknownTransformError,
+    diff_mappings,
+    preview,
+)
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -33,12 +39,6 @@ from fitos_api.audit import record
 from fitos_api.auth.deps import require, scoped_session
 from fitos_api.auth.principal import Principal
 from fitos_api.capabilities import Capability
-from fitos_api.mapping import (
-    MappingSpec,
-    UnknownTransformError,
-    diff_mappings,
-    preview,
-)
 from fitos_api.models import Connection, MappingVersion
 
 router = APIRouter(prefix="/v1/mappings", tags=["mappings"])
