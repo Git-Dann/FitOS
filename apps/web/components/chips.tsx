@@ -1,7 +1,7 @@
 /**
  * Status, severity, confidence and exposure chips.
  *
- * Two rules from the design system shape all of these:
+ * Three rules from the design system shape all of these:
  *
  * §9 — status is never carried by colour alone. Every chip has a glyph and a
  * word, so it survives greyscale, colour blindness and a screenshot printed in
@@ -9,6 +9,12 @@
  *
  * §2 (accent discipline) — accent is reserved for interaction. Severity uses
  * the status ramp; nothing here borrows accent to look urgent.
+ *
+ * §2 again, and this one was got wrong first time round: "severity chips use a
+ * small coloured dot with neutral text rather than coloured text". Colouring
+ * the label put a red word a few pixels from an orange selection bar, which is
+ * the collision the rule exists to prevent. The colour now lives in a 6px dot
+ * and the word is neutral.
  */
 import { hasExposure } from "@/lib/demo-gaps";
 import type { ConfidenceBand, DemoGap, GapStatus, Severity } from "@/lib/demo-gaps";
@@ -24,7 +30,8 @@ const SEVERITY_GLYPH: Record<Severity, string> = {
 
 export function SeverityChip({ severity }: { severity: Severity }) {
   return (
-    <span className={`chip chip-${severity}`}>
+    <span className={`chip chip-severity chip-${severity}`}>
+      <span className="chip-dot" aria-hidden="true" />
       <span className="chip-glyph" aria-hidden="true">
         {SEVERITY_GLYPH[severity]}
       </span>
@@ -77,6 +84,33 @@ export function ConfidenceMeter({ band, score }: { band: ConfidenceBand; score: 
 }
 
 /**
+ * The mark that says a figure is modelled rather than counted.
+ *
+ * It goes *before* the number, not after. A marker trailing a value reads as
+ * punctuation; a marker leading it reads as a qualifier — and this one has to
+ * be read as a qualifier, because §2 requires modelled and observed data to be
+ * distinguishable and the row is full of observed percentages carrying no mark
+ * at all. `ModelledKey` puts one sentence on the route explaining it, so the
+ * distinction is learnable rather than folkloric.
+ */
+export function ModelledMark() {
+  return (
+    <span className="modelled-mark" title="Modelled from at least one assumption">
+      <span aria-hidden="true">▨</span>
+      <span className="visually-hidden">modelled: </span>
+    </span>
+  );
+}
+
+export function ModelledKey() {
+  return (
+    <span className="modelled-key">
+      <span aria-hidden="true">▨</span> modelled from an assumption · everything else is counted
+    </span>
+  );
+}
+
+/**
  * An exposure, always as a range, never without its confidence adjacent.
  *
  * design-concepts.md, information hierarchy: "Exposure never appears without
@@ -95,13 +129,8 @@ export function ExposureCell({ gap }: { gap: DemoGap }) {
   }
   return (
     <span className="exposure">
+      {gap.isModelled ? <ModelledMark /> : null}
       {exposureRange(gap.exposureLow, gap.exposureHigh, gap.currency)}
-      {gap.isModelled ? (
-        <span className="modelled-mark" title="Modelled from at least one assumption">
-          {" "}
-          ▨
-        </span>
-      ) : null}
     </span>
   );
 }

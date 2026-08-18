@@ -492,3 +492,69 @@ either is a deliberate edit to a test that says what it is protecting.
 `packs/retail` with the rest of it. They are pack-neutral today and
 `packs/retail/tests/test_pack_contract.py` keeps them that way, so nothing is
 broken — but the move should happen when the UI copy lands.
+
+## Design review of the ledger (Phase E)
+
+The first ledger build was rejected on sight — "this isn't helpful to anyone… not friendly or
+sellable". The design-reviewer subagent then failed the route with three P0s and nine P1s, and the
+diagnosis was measurable rather than a matter of taste: a critical row and a medium row had the
+identical background, title size, weight and height, and differed only in a 60 × 18 px chip — about
+1.6% of the row's area. `docs/design-concepts.md` had predicted exactly this under Concept A's own
+Risks ("uniform rows flatten severity … unless grouping and colour carry real weight"), the risk
+was accepted, and then not mitigated.
+
+### Fixed in this pass
+
+| Finding | What changed |
+| --- | --- |
+| P0-1 · no entry point | `SituationStrip` above the ledger: open count with severity filter pills, the exposure envelope, and a stale-input count |
+| P0-2 · severity carried 1.6% of the row | Severity rail down the row edge, a wash on critical rows, group headers promoted with a status dot and the group's own exposure envelope |
+| P0-3 · modelled money unmarked | `▨` moved to a **prefix** on every surface, with a one-line key on the route: "modelled from an assumption · everything else is counted" |
+| P1-4 · type scale collapsed | `--text-2xl` defined; route `<h1>` from 13px to `--text-xl`; row titles to `--text-base`; the strip's figure is the only `2xl` in the product |
+| P1-7 · coloured chip labels | §2 verbatim: a 6px coloured dot with neutral text, glyph and word retained |
+| P1-8 · tier-1 tokens in components | `--status-{critical,high,medium,low}` and `-border` added to the **semantic** tier; every component reference moved off the primitive ramps; all four hand-written light-theme overrides deleted |
+| P1-9 · refusal read as helper text | `--status-critical` with a `⚠`, an invalid border on the textarea, `aria-invalid`, `aria-describedby` and `role="status"` |
+| P1-10 · counts desynced after a dismissal | The inbox owns its own shell; nav badge, route title and list all derive from one piece of state |
+| P1-11 · light theme unreachable | Theme toggle in the top bar, applied pre-paint by an inline script, persisted; every route now captured in both themes |
+| P1-12 · 390px inverted the hierarchy | Title wraps to two lines and the low-value metadata is what gives way; every touch target at 48px |
+| P2-13 · accent never used for an action | The advance action takes `--accent-fill`; the exposure band's base marker moved off accent to a neutral diamond |
+| P2-18 · route advertised its own incompleteness | Roadmap clause removed from the keyboard hint |
+| P3-21 · demo banner outweighed the data | One line with the paragraph behind a disclosure. Still not dismissible (product-spec §8) |
+
+### Deliberate deviations, stated rather than drifted
+
+- **The row is three lines, not the 32px `--row-height-compact` §5 names as the inbox default.**
+  The third line is the first `recommended_actions` entry, which is the row's answer to "so what"
+  and the reason it is actionable rather than informational. `--row-height-comfortable` and the
+  persisted density preference §5 promises are still owed.
+- **Exposure appears as a range with no base in the row.** This matches
+  `docs/design-concepts.md` §Concept A and is required by `gap-model.md` §3; the base is in the peek
+  next to its confidence breakdown.
+
+### Still owed before the route can be called complete
+
+- State coverage: loading skeleton, delayed, partial, no-data (as distinct from no-gaps), offline
+  recovery. Only empty-filter, unauthorised (frontline) and one error state are captured.
+- The confidence meter is four 5px pips; the whole visual difference between high and medium is one
+  dot moving 50 luminance units (P2-14).
+- Native `<select>` on the primary route; the `Select` primitive §7 lists is not built (P2-15).
+- The metrics route is three tall cards with ~580px of dead gutter; it should be a table like
+  `/sources`, which is the one screen the reviewer called good and told us to copy (P2-17).
+- No `⤢ Open` from peek to detail, and the detail route is read-only (P2-19).
+- The §10 lint rule forbidding tier-1 token references in components still does not exist. The
+  violations are gone; the guard that would stop them coming back is not.
+
+### What the redesign surfaced in the data
+
+Giving exposure real visual weight immediately exposed a fixture defect that had been invisible as
+grey 11px text: **NS-033 carried `isModelled: true` with `low === base === high`**, rendering as a
+single exact `£26,550` standing on an organisation assumption — the precision `gap-model.md` §3
+exists to forbid. The assumption is now a band (£32–£61 per conversion), and
+`apps/web/lib/demo-gaps.test.ts` asserts the invariant over the whole fixture, along with exposure
+ordering, the 5× wide-interval rule, the four things a gap may not exist without, and pack-scoped
+playbook ids. Two of those seven contract tests failed on first run.
+
+`packages/ui` gained a real guard too. The unresolved-reference test matched only `neutral.` and
+`accent.` by name, so when the nested status ramps were added the resolver emitted
+`--status-critical: [object Object]` and the test passed. It now asserts every emitted declaration
+is a hex literal, and the mutation that reproduces the original bug fails it.

@@ -11,12 +11,18 @@ const tokens = JSON.parse(
   readFileSync(resolve(here, "../../../docs/design-tokens/tokens.json"), "utf8"),
 );
 
-/** "neutral.400" -> "#9497A1"; a literal "#RRGGBB" passes through. */
+/**
+ * "neutral.400" -> "#9497A1"; "status.critical.400" -> "#FF6166"; a literal
+ * "#RRGGBB" passes through.
+ *
+ * The status ramps are nested one level deeper than the flat scales, and the
+ * two-segment version of this function silently produced `[object Object]` for
+ * them rather than failing — so the throw below is not decoration.
+ */
 const resolveRef = (raw) => {
   if (raw.startsWith("#")) return raw;
-  const [scale, step] = raw.split(".");
-  const value = tokens.primitive[scale]?.[step];
-  if (!value) throw new Error(`unresolvable token reference: ${raw}`);
+  const value = raw.split(".").reduce((node, key) => node?.[key], tokens.primitive);
+  if (typeof value !== "string") throw new Error(`unresolvable token reference: ${raw}`);
   return value;
 };
 

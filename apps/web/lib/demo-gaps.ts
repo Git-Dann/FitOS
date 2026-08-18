@@ -53,6 +53,23 @@ export interface ConfidenceComponent {
   score: number;
 }
 
+/**
+ * A suggested next step, straight from `gap.recommended_actions`
+ * (docs/gap-model.md §1). It is a *suggestion*, not a promise: the rationale
+ * says what would be true if it worked, and nothing here claims a saving.
+ *
+ * It lives on the aggregate rather than being composed in the UI on purpose.
+ * A recommendation assembled from a copy string in a React component is a
+ * recommendation the pack cannot own, cannot version and cannot translate —
+ * and CLAUDE.md's "packs own their vocabulary" rule exists for that reason.
+ */
+export interface RecommendedAction {
+  key: string;
+  title: string;
+  rationale: string;
+  playbookId: string;
+}
+
 export interface DemoGap {
   id: string;
   reference: string;
@@ -107,6 +124,7 @@ export interface DemoGap {
   ruleVersion: number;
   reasonCodes: string[];
   evidence: EvidenceRef[];
+  recommendedActions: RecommendedAction[];
 }
 
 /** Fixed so the ledger renders identically on every load and in every
@@ -193,6 +211,22 @@ export const DEMO_GAPS: DemoGap[] = [
         sensitivity: "internal",
       },
     ],
+    recommendedActions: [
+      {
+        key: "recount_discrepant_lines",
+        title: "Recount the 41 discrepant lines before the weekend peak",
+        rationale:
+          "The two sources disagree on 41 of 120 checks. A recount establishes which one is wrong; until it does, neither figure can be trusted for replenishment.",
+        playbookId: "retail.stock_recount.v2",
+      },
+      {
+        key: "hold_auto_replenishment",
+        title: "Pause auto-replenishment on the affected lines",
+        rationale:
+          "Replenishment reads the inventory record. While that record is disputed, each cycle compounds the error rather than correcting it.",
+        playbookId: "retail.replenishment_hold.v1",
+      },
+    ],
   },
   {
     id: "0199a1d2-0000-7000-8000-000000000007",
@@ -251,6 +285,22 @@ export const DEMO_GAPS: DemoGap[] = [
         sensitivity: "internal",
       },
     ],
+    recommendedActions: [
+      {
+        key: "check_counter_uplink",
+        title: "Check the Oxford Street counter\u2019s uplink",
+        rationale:
+          "The device has not reported for 31 hours against a one-hour cadence. Every conversion metric scoped to this site is computed on a stale denominator until it does.",
+        playbookId: "ops.device_connectivity.v1",
+      },
+      {
+        key: "suppress_dependent_metrics",
+        title: "Suppress conversion for this site until the feed recovers",
+        rationale:
+          "A conversion rate over a stale footfall denominator is not a low reading, it is an unusable one. Suppressing it is more honest than publishing it.",
+        playbookId: "ops.metric_suppression.v1",
+      },
+    ],
   },
   {
     id: "0199a1d2-0000-7000-8000-000000000021",
@@ -306,6 +356,22 @@ export const DEMO_GAPS: DemoGap[] = [
         sensitivity: "internal",
       },
     ],
+    recommendedActions: [
+      {
+        key: "verify_peer_cohort",
+        title: "Confirm the peer group still matches this store\u2019s format",
+        rationale:
+          "A peer comparison is only as good as its cohort. If Trafford was re-formatted since the cohort was built, the gap may be in the cohort rather than the store.",
+        playbookId: "retail.peer_cohort_review.v1",
+      },
+      {
+        key: "observe_floor_at_peak",
+        title: "Observe the floor at Saturday peak",
+        rationale:
+          "The metric shows a difference, not a cause. A structured floor observation is the cheapest way to produce a hypothesis worth testing.",
+        playbookId: "retail.floor_observation.v3",
+      },
+    ],
   },
   {
     id: "0199a1d2-0000-7000-8000-000000000033",
@@ -325,9 +391,16 @@ export const DEMO_GAPS: DemoGap[] = [
     unit: "ratio",
     observedLabel: "180 of 1,100 continued",
     expectedLabel: "70% expected at this step",
-    exposureLow: 2655000,
+    // 590 conversions short, priced against the organisation's assumed value
+    // per conversion. That assumption is a band, not a point — gap-model.md §3
+    // gives every modelled input a low/base/high — and an earlier version of
+    // this fixture collapsed all three to 4500, which produced a *modelled*
+    // exposure of exactly £26,550. A modelled figure with a zero-width interval
+    // claims a precision its inputs do not have, which is the presentation §3
+    // exists to prevent.
+    exposureLow: 1888000,
     exposureBase: 2655000,
-    exposureHigh: 2655000,
+    exposureHigh: 3599000,
     currency: "GBP",
     isModelled: true,
     formulaLabel: "conversions short × value per conversion",
@@ -342,7 +415,7 @@ export const DEMO_GAPS: DemoGap[] = [
       {
         key: "value_per_conversion_minor",
         statement: "Value of one conversion at this step, set by the organisation",
-        value: "4500",
+        value: "3200 – 4500 – 6100",
         source: "organization_assumption",
         kind: "assumption",
       },
@@ -379,6 +452,22 @@ export const DEMO_GAPS: DemoGap[] = [
         sourceLabel: "App analytics REST",
         rowCount: 10000,
         sensitivity: "internal",
+      },
+    ],
+    recommendedActions: [
+      {
+        key: "reproduce_on_client_version",
+        title: "Reproduce the order step on iOS 4.2.1",
+        rationale:
+          "The drop is confined to one client version, which points at the client rather than the basket. Reproduction turns a correlation into something a fix can target.",
+        playbookId: "digital.client_repro.v2",
+      },
+      {
+        key: "stage_rollback_candidate",
+        title: "Stage a rollback of the 4.2.1 checkout bundle",
+        rationale:
+          "Staging the rollback costs one build. Whether to ship it stays with the release owner.",
+        playbookId: "digital.release_rollback.v1",
       },
     ],
   },
@@ -452,6 +541,22 @@ export const DEMO_GAPS: DemoGap[] = [
         sensitivity: "confidential",
       },
     ],
+    recommendedActions: [
+      {
+        key: "review_markdown_ladder",
+        title: "Review the markdown ladder applied to this line",
+        rationale:
+          "Margin moved while volume did not. Price and cost are the two remaining inputs, and the markdown ladder is the one under your control this week.",
+        playbookId: "merch.markdown_review.v2",
+      },
+      {
+        key: "confirm_landed_cost",
+        title: "Confirm the landed cost on the latest intake",
+        rationale:
+          "A cost restatement mid-period moves margin without anything happening on the shop floor. Ruling it out costs one lookup.",
+        playbookId: "merch.landed_cost_check.v1",
+      },
+    ],
   },
   {
     id: "0199a1d2-0000-7000-8000-000000000052",
@@ -519,7 +624,12 @@ export const DEMO_GAPS: DemoGap[] = [
     dataFreshnessSeconds: 10800,
     ruleKey: "attribution_comparison",
     ruleVersion: 1,
-    reasonCodes: ["attribution_below_baseline", "method_last_touch", "attribution_limited"],
+    reasonCodes: [
+      "attribution_below_baseline",
+      "method_last_touch",
+      "attribution_limited",
+      "modelled_exposure",
+    ],
     evidence: [
       {
         canonicalEntity: "fact_campaign_spend",
@@ -529,6 +639,22 @@ export const DEMO_GAPS: DemoGap[] = [
         sourceLabel: "Ad platform REST",
         rowCount: 900,
         sensitivity: "confidential",
+      },
+    ],
+    recommendedActions: [
+      {
+        key: "hold_before_reallocating",
+        title: "Hold the budget where it is for one more week",
+        rationale:
+          "This reading carries a wide exposure interval and medium confidence. Reallocating on it would be acting on noise; another week either confirms the gap or dissolves it.",
+        playbookId: "growth.budget_hold.v1",
+      },
+      {
+        key: "check_attribution_window",
+        title: "Check the attribution window against the purchase cycle",
+        rationale:
+          "A campaign judged over a window shorter than its purchase cycle will read below baseline whether or not it is.",
+        playbookId: "growth.attribution_window.v2",
       },
     ],
   },
@@ -589,6 +715,22 @@ export const DEMO_GAPS: DemoGap[] = [
         sourceLabel: "Loyalty REST",
         rowCount: 5000,
         sensitivity: "internal",
+      },
+    ],
+    recommendedActions: [
+      {
+        key: "requeue_missing_partitions",
+        title: "Re-request the missing partitions from the loyalty export",
+        rationale:
+          "59% of expected records did not arrive. Re-requesting is cheap, and either recovers them or proves the export itself is the problem.",
+        playbookId: "ops.partition_requeue.v1",
+      },
+      {
+        key: "mark_dependent_gaps_partial",
+        title: "Mark gaps scoped to loyalty segments as partial",
+        rationale:
+          "Any gap scoped to a loyalty segment this window is computed on 41% of its input. Publishing it without saying so would be a silent partial.",
+        playbookId: "ops.partial_result_flag.v1",
       },
     ],
   },
@@ -660,6 +802,15 @@ export const DEMO_GAPS: DemoGap[] = [
         sourceLabel: "POS CSV upload",
         rowCount: 210,
         sensitivity: "internal",
+      },
+    ],
+    recommendedActions: [
+      {
+        key: "sample_recount_leeds",
+        title: "Sample-recount the discrepant lines at Leeds",
+        rationale:
+          "At 9% this is above baseline but well below Oxford Street. A sample establishes whether it is drifting or stable before anyone commits to a full count.",
+        playbookId: "retail.stock_recount.v2",
       },
     ],
   },

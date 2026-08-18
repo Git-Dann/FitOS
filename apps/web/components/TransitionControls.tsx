@@ -114,7 +114,11 @@ export function TransitionControls({
             <button
               key={target}
               type="button"
-              className="control control-action"
+              className={
+                target === targets[0]
+                  ? "control control-action control-primary"
+                  : "control control-action"
+              }
               disabled={refusal !== null}
               title={refusal?.message}
               onClick={() => onTransition({ to: target })}
@@ -164,10 +168,21 @@ export function TransitionControls({
             rows={2}
             value={note}
             placeholder="Why is this particular gap not worth acting on?"
+            aria-invalid={dismissRefusal !== null}
+            aria-describedby={dismissRefusal ? "dismiss-refusal" : undefined}
             onChange={(event) => setNote(event.target.value)}
           />
 
-          {dismissRefusal ? <p className="action-note">{dismissRefusal.message}</p> : null}
+          {/* A refusal has to look like one. This rendered in --fg-muted with
+              no glyph and no border change, which put it 25 luminance units
+              from a field label — the copy was right and the treatment threw it
+              away. The live region is what makes it reach a screen reader when
+              it appears after the control was already focused. */}
+          {dismissRefusal ? (
+            <p className="action-refusal" id="dismiss-refusal" role="status">
+              <span aria-hidden="true">⚠</span> {dismissRefusal.message}
+            </p>
+          ) : null}
 
           <button
             type="button"

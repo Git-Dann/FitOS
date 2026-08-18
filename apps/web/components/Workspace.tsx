@@ -10,12 +10,18 @@
  * it obvious that no component is deciding what to hide.
  */
 import { useMemo, useState } from "react";
-import type { DemoGap } from "@/lib/demo-gaps";
+import type { DemoGap, Severity } from "@/lib/demo-gaps";
+import { DEMO_AS_OF } from "@/lib/demo-gaps";
+import { STALE_SECONDS, summarise } from "@/lib/situation";
+import { SituationStrip } from "./SituationStrip";
+import { count, dateTime } from "@/lib/format";
 import { ROLES, ROLE_CAPABILITIES, type Role, withheldForCapabilities } from "@/lib/roles";
 import { ACTOR, assign, transition, type LedgerState } from "@/lib/ledger-state";
 import type { TransitionRequest } from "./TransitionControls";
 import type { GapStatus } from "@fitos/contracts/lifecycle";
 import { GapLedger } from "./GapLedger";
+import { AppShell } from "./AppShell";
+import { DEMO_SOURCES } from "@/lib/demo-sources";
 
 export type ViewKey = "all" | "mine" | "stale" | "unowned";
 
@@ -25,8 +31,6 @@ const VIEWS: { key: ViewKey; label: string; describe: string }[] = [
   { key: "stale", label: "Stale", describe: "Source data older than 6 hours" },
   { key: "unowned", label: "Unowned", describe: "Nobody has picked these up" },
 ];
-
-const STALE_SECONDS = 6 * 3600;
 
 function applyView(gaps: DemoGap[], view: ViewKey): DemoGap[] {
   switch (view) {
@@ -61,6 +65,7 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
   const [role, setRole] = useState<Role>("manager");
   const [view, setView] = useState<ViewKey>("all");
   const [query, setQuery] = useState("");
+  const [severity, setSeverity] = useState<Severity | null>(null);
   const [state, setState] = useState<LedgerState>({ gaps, audit: {} });
 
   const capabilities = ROLE_CAPABILITIES[role];
@@ -76,15 +81,40 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
   // at the boundary, never in a component that chose not to draw it.
   const visible = useMemo(() => withheldForCapabilities(open, capabilities), [open, capabilities]);
 
-  const filtered = useMemo(
-    () => applySearch(applyView(visible, view), query),
-    [visible, view, query],
-  );
+  // The strip summarises what the *view* holds, before the severity pill and
+  // the search box narrow it further. Recomputing it from the filtered list
+  // would make the counts change as you click them, which is the one thing an
+  // orientation layer must not do.
+  const summary = useMemo(() => summarise(applyView(visible, view)), [visible, view]);
+
+  const filtered = useMemo(() => {
+    const inView = applyView(visible, view);
+    const bySeverity = severity ? inView.filter((gap) => gap.severity === severity) : inView;
+    return applySearch(bySeverity, query);
+  }, [visible, view, query, severity]);
 
   const activeView = VIEWS.find((entry) => entry.key === view);
 
+  // One count, derived from the list that is actually on screen. The nav badge,
+  // the route title and the ledger cannot disagree because there is nothing for
+  // them to disagree about.
+  const staleSources = DEMO_SOURCES.filter(
+    (source) => source.state !== "healthy" && source.state !== "fixture",
+  ).length;
+
   return (
-    <>
+    <AppShell
+      title="Inbox"
+      inboxCount={visible.length}
+      meta={`as of ${dateTime(DEMO_AS_OF)} · ${count(DEMO_SOURCES.length)} sources · ${count(staleSources)} not healthy`}
+    >
+      <SituationStrip
+        summary={summary}
+        asOfLabel={dateTime(DEMO_AS_OF)}
+        activeSeverity={severity}
+        onSeverity={setSeverity}
+      />
+
       <div className="toolbar">
         <label className="visually-hidden" htmlFor="role">
           Role
@@ -128,9 +158,15 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
           onChange={(event) => setQuery(event.target.value)}
         />
 
+        {severity ? (
+          <button type="button" className="filter-clear" onClick={() => setSeverity(null)}>
+            {severity} only <span aria-hidden="true">✕</span>
+          </button>
+        ) : null}
+
         <span className="topbar-spacer" />
-        <span className="tabular">
-          {filtered.length} of {visible.length}
+        <span className="toolbar-count tabular">
+          {count(filtered.length)} of {count(visible.length)}
         </span>
       </div>
 
@@ -149,11 +185,12 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
         <div className="empty">
           <p>
             Nothing matches {activeView?.label.toLowerCase()}
+            {severity ? ` and ${severity} severity` : ""}
             {query ? ` and “${query}”` : ""}.
           </p>
           <p style={{ color: "var(--fg-subtle)", fontSize: "var(--text-xs)" }}>
-            {visible.length} gaps are open outside this filter. This is a filter result, not an
-            empty ledger.
+            {count(visible.length)} gaps are open outside this filter. This is a filter result, not
+            an empty ledger.
           </p>
         </div>
       ) : (
@@ -169,6 +206,6 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
           }
         />
       )}
-    </>
+    </AppShell>
   );
 }

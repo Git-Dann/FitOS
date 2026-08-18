@@ -25,57 +25,60 @@ export default function SourcesPage() {
       meta={`${live.length} configured · ${DEMO_SOURCES.length - live.length} fixtures`}
     >
       <div className="route-body">
-        <table className="table">
-          <caption className="visually-hidden">
-            Connector sources with their state, freshness and record counts
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Source</th>
-              <th scope="col">State</th>
-              <th scope="col">Age</th>
-              <th scope="col">Cadence</th>
-              <th scope="col">Accepted</th>
-              <th scope="col">Rejected</th>
-              <th scope="col">Last run</th>
-            </tr>
-          </thead>
-          <tbody>
-            {DEMO_SOURCES.map((source) => (
-              <tr key={source.key}>
-                <th scope="row">
-                  {source.label}
-                  <div className="mono">{source.connector}</div>
-                </th>
-                <td>
-                  <span className={`chip chip-source-${source.state}`}>
-                    <span className="chip-glyph" aria-hidden="true">
-                      {SOURCE_STATE_GLYPH[source.state]}
-                    </span>
-                    {source.state.replace("_", " ")}
-                  </span>
-                </td>
-                <td className="tabular">
-                  {source.ageSeconds === null ? (
-                    <span className="exposure-none">never reported</span>
-                  ) : (
-                    age(source.ageSeconds)
-                  )}
-                </td>
-                <td className="tabular">{age(source.expectedLatencySeconds)}</td>
-                <td className="tabular">{count(source.recordsAccepted)}</td>
-                <td className="tabular">
-                  {source.recordsRejected > 0 ? (
-                    <strong>{count(source.recordsRejected)}</strong>
-                  ) : (
-                    count(source.recordsRejected)
-                  )}
-                </td>
-                <td className="tabular">{source.lastRunAt ? dateTime(source.lastRunAt) : "—"}</td>
+        <div className="table-scroll">
+          <table className="table">
+            <caption className="visually-hidden">
+              Connector sources with their state, freshness and record counts
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Source</th>
+                <th scope="col">State</th>
+                <th scope="col">Age</th>
+                <th scope="col">Cadence</th>
+                <th scope="col">Accepted</th>
+                <th scope="col">Rejected</th>
+                <th scope="col">Last run</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {DEMO_SOURCES.map((source) => (
+                <tr key={source.key}>
+                  <th scope="row">
+                    {source.label}
+                    <div className="mono">{source.connector}</div>
+                  </th>
+                  <td>
+                    <span className={`chip chip-severity chip-source-${source.state}`}>
+                      <span className="chip-dot" aria-hidden="true" />
+                      <span className="chip-glyph" aria-hidden="true">
+                        {SOURCE_STATE_GLYPH[source.state]}
+                      </span>
+                      {source.state.replace("_", " ")}
+                    </span>
+                  </td>
+                  <td className="tabular">
+                    {source.ageSeconds === null ? (
+                      <span className="exposure-none">never reported</span>
+                    ) : (
+                      age(source.ageSeconds)
+                    )}
+                  </td>
+                  <td className="tabular">{age(source.expectedLatencySeconds)}</td>
+                  <td className="tabular">{count(source.recordsAccepted)}</td>
+                  <td className="tabular">
+                    {source.recordsRejected > 0 ? (
+                      <strong>{count(source.recordsRejected)}</strong>
+                    ) : (
+                      count(source.recordsRejected)
+                    )}
+                  </td>
+                  <td className="tabular">{source.lastRunAt ? dateTime(source.lastRunAt) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         <div className="route-notes">
           {DEMO_SOURCES.map((source) => (

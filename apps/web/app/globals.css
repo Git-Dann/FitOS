@@ -69,6 +69,7 @@ body {
   --text-base: 15px;
   --text-lg: 18px;
   --text-xl: 22px;
+  --text-2xl: 28px;
 
   --nav-width: 216px;
   --peek-width: 480px;
@@ -173,16 +174,20 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 44px;
+  min-height: 56px;
   padding: 0 16px;
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-surface);
 }
 
+/* §3 puts route titles at text-xl. This was text-sm, which made the <h1>
+   smaller than the row titles underneath it — the route where hierarchy
+   matters most was the one spending nothing on it. */
 .topbar h1 {
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-xl);
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .topbar-spacer {
@@ -198,9 +203,10 @@ body {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 36px;
-  padding: 0 16px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-height: 40px;
+  padding: 7px 16px;
   border-bottom: 1px solid var(--border-default);
   font-size: var(--text-xs);
   color: var(--fg-muted);
@@ -211,14 +217,35 @@ body {
 /* product-spec.md §8: demo data is labelled on every surface where it appears,
    including screenshots. Not dismissible for that reason. */
 .demo-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
   font-size: var(--text-xs);
   background: var(--bg-raised);
   border-bottom: 1px solid var(--border-default);
   color: var(--fg-muted);
+}
+
+.demo-banner summary {
+  padding: 6px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.demo-banner summary::-webkit-details-marker {
+  display: none;
+}
+
+.demo-banner summary::after {
+  content: " ⓘ";
+  color: var(--fg-subtle);
+}
+
+.demo-banner[open] summary::after {
+  content: " ✕";
+}
+
+.demo-banner p {
+  margin: 0;
+  padding: 0 16px 10px;
+  max-width: 78ch;
 }
 
 .demo-banner strong {
@@ -226,18 +253,171 @@ body {
   font-weight: 600;
 }
 
-/* --- group headers and rows ---------------------------------------------- */
+/* --- situation strip ------------------------------------------------------ */
+
+/* The orientation band. Deliberately not "three metric cards": one hairline
+   container, three columns, no fills and no shadows. §4 forbids giant metric
+   cards, and §2 keeps accent for interaction — nothing here is coloured to
+   look urgent, because urgency is the rows' job. */
+.situation {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 24px;
+  padding: 16px 16px 18px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface);
+}
+
+.situation-figure {
+  min-width: 0;
+}
+
+.situation-label {
+  margin: 0 0 4px;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+/* The largest type in the signed-in product, and the only place it appears. */
+.situation-value {
+  margin: 0;
+  font-size: var(--text-2xl);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  color: var(--fg-default);
+}
+
+/* "withheld", "none priced", "not summable" are sentences, not figures, and
+   must not be mistaken for one at a glance. */
+.situation-value-absent {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+
+.situation-value-unit {
+  font-size: var(--text-base);
+  font-weight: 400;
+  color: var(--fg-subtle);
+  letter-spacing: 0;
+}
+
+.situation-note {
+  margin: 5px 0 0;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  max-width: 46ch;
+}
+
+.situation-note strong {
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
+.situation-severities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.sev-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: none;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.sev-pill:hover {
+  background: var(--bg-raised);
+  color: var(--fg-default);
+}
+
+.sev-pill[aria-pressed="true"] {
+  background: var(--bg-raised);
+  border-color: var(--border-strong);
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
+.sev-pill-word {
+  color: var(--fg-subtle);
+}
+
+.sev-pill[aria-pressed="true"] .sev-pill-word {
+  color: var(--fg-muted);
+}
+
+.sev-pill-critical {
+  color: var(--status-critical);
+}
+.sev-pill-high {
+  color: var(--status-high);
+}
+.sev-pill-medium {
+  color: var(--status-medium);
+}
+.sev-pill-low {
+  color: var(--status-low);
+}
+
+@media (max-width: 1080px) {
+  .situation {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .situation {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+
+/* --- group headers -------------------------------------------------------- */
 
 .group-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 16px 6px;
+  padding: 20px 16px 7px;
+  margin: 0;
   font-size: var(--text-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--fg-muted);
+  font-weight: 600;
 }
+
+.group-header {
+  color: var(--fg-default);
+}
+
+.group-header-count {
+  color: var(--fg-subtle);
+  letter-spacing: 0;
+}
+
+/* A hairline running to the edge, so the band reads as a divider rather than
+   as a stray label sitting on top of the first row. */
+.group-header-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--border-default);
+}
+
+/* --- rows ----------------------------------------------------------------- */
 
 .gap-list {
   list-style: none;
@@ -245,14 +425,20 @@ body {
   padding: 0;
 }
 
+/* Three columns: the rail, the substance, the figures. The rail is what gives
+   severity weight a chip cannot — but it is never the only cue, because the
+   severity word sits in the metadata line and §9 forbids colour alone. */
 .gap-row {
-  display: block;
+  display: grid;
+  grid-template-columns: 3px minmax(0, 1fr) auto;
+  gap: 0 14px;
+  align-items: start;
   width: 100%;
   text-align: left;
   background: none;
   border: 0;
   border-bottom: 1px solid var(--border-default);
-  padding: 6px 16px 8px;
+  padding: 10px 16px 11px 13px;
   cursor: pointer;
   color: inherit;
   font: inherit;
@@ -264,54 +450,150 @@ body {
 
 .gap-row[aria-current="true"] {
   background: var(--bg-raised);
-  box-shadow: inset 2px 0 0 var(--accent-fill);
 }
 
-.gap-row-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 20px;
+.gap-rail {
+  align-self: stretch;
+  min-height: 34px;
+  border-radius: 999px;
+  background: var(--border-strong);
 }
 
+.gap-row-critical .gap-rail {
+  background: var(--status-critical);
+}
+.gap-row-high .gap-rail {
+  background: var(--status-high);
+}
+.gap-row-medium .gap-rail {
+  background: var(--status-medium);
+}
+.gap-row-low .gap-rail {
+  background: var(--status-low);
+}
+
+/* A critical row carries a wash as well as a rail, so the block reads as a
+   region rather than as a list item with a coloured edge. `color-mix` keeps
+   this a token derivation — no literal enters the stylesheet. */
+.gap-row-critical {
+  background: color-mix(in srgb, var(--status-critical) 6%, transparent);
+}
+
+.gap-row-critical:hover {
+  background: color-mix(in srgb, var(--status-critical) 11%, transparent);
+}
+
+.gap-row-critical[aria-current="true"] {
+  background: color-mix(in srgb, var(--status-critical) 14%, transparent);
+}
+
+.gap-main {
+  display: block;
+  min-width: 0;
+}
+
+/* The one line a scanning eye is meant to land on. */
 .gap-title {
-  font-size: var(--text-sm);
+  display: block;
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1.35;
   color: var(--fg-default);
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
+  min-width: 0;
+}
+
+.gap-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 7px;
+  margin-top: 3px;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.gap-meta-strong {
+  color: var(--fg-muted);
+}
+
+/* The "so what". It is the reason the row is actionable rather than
+   informational, so it gets its own line rather than a tooltip. */
+.gap-action {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 7px;
+  font-size: var(--text-xs);
+  min-width: 0;
+}
+
+.gap-action-glyph {
+  color: var(--fg-subtle);
+}
+
+.gap-action-title {
+  color: var(--fg-default);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.gap-action-rationale {
+  color: var(--fg-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.gap-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Exposure is the figure that decides which gap gets picked up. It was
+   previously the same weight and colour as the scope label beside it. */
+.gap-exposure {
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-default);
+  letter-spacing: -0.01em;
+}
+
+.gap-side-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .gap-ref {
   font-size: var(--text-xs);
   color: var(--fg-subtle);
-  font-variant-numeric: tabular-nums;
-}
-
-.gap-row-meta {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 3px;
-  padding-left: 26px;
-  font-size: var(--text-xs);
-  color: var(--fg-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.gap-scope {
-  color: var(--fg-subtle);
 }
 
 /* --- chips ---------------------------------------------------------------- */
 
+/* §2, verbatim: "severity chips use a small coloured dot with neutral text
+   rather than coloured text". The earlier version set the *label* to the status
+   colour, which put a red word six pixels from an orange selection bar — the
+   accent/status collision §2 was written to prevent, since accent-400 and
+   status-high-400 sit at 1.65:1 and cannot be separated by hue.
+
+   The dot is never the only cue: every chip also carries a glyph and the word
+   itself, so it survives greyscale and colour blindness (§9). */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   height: 18px;
-  padding: 0 6px;
+  padding: 0 7px;
   border-radius: 6px;
   font-size: var(--text-2xs);
   letter-spacing: 0.04em;
@@ -322,41 +604,47 @@ body {
   white-space: nowrap;
 }
 
-/* Severity never relies on colour alone — each chip carries a glyph and a
-   label, per §9 (non-colour status cues). */
-.chip-critical {
-  color: var(--status-critical-400);
-  border-color: var(--status-critical-700);
-}
-.chip-high {
-  color: var(--status-high-400);
-  border-color: var(--status-high-700);
-}
-.chip-medium {
-  color: var(--status-medium-400);
-  border-color: var(--status-medium-700);
-}
-.chip-low {
-  color: var(--status-low-400);
-  border-color: var(--status-low-700);
+.chip-severity {
+  color: var(--fg-default);
 }
 
-:root[data-theme="light"] .chip-critical {
-  color: var(--status-critical-700);
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  flex: none;
 }
-:root[data-theme="light"] .chip-high {
-  color: var(--status-high-700);
+
+.chip-critical {
+  border-color: var(--status-critical-border);
 }
-:root[data-theme="light"] .chip-medium {
-  color: var(--status-medium-700);
+.chip-critical .chip-dot {
+  background: var(--status-critical);
 }
-:root[data-theme="light"] .chip-low {
-  color: var(--status-low-700);
+.chip-high {
+  border-color: var(--status-high-border);
+}
+.chip-high .chip-dot {
+  background: var(--status-high);
+}
+.chip-medium {
+  border-color: var(--status-medium-border);
+}
+.chip-medium .chip-dot {
+  background: var(--status-medium);
+}
+.chip-low {
+  border-color: var(--status-low-border);
+}
+.chip-low .chip-dot {
+  background: var(--status-low);
 }
 
 .chip-glyph {
   font-size: var(--text-2xs);
   line-height: 1;
+  color: var(--fg-subtle);
 }
 
 /* --- confidence meter ----------------------------------------------------- */
@@ -396,9 +684,12 @@ body {
 /* A modelled figure is marked wherever it appears. gap-model.md §3: observed
    and modelled values are never rendered by the same component without the
    distinction being visible. */
+/* Leading the figure, with real space after it, so it reads as a qualifier
+   rather than as a smudge on the first digit. */
 .modelled-mark {
   color: var(--fg-subtle);
   font-size: var(--text-2xs);
+  margin-right: 5px;
 }
 
 /* --- peek ----------------------------------------------------------------- */
@@ -487,14 +778,16 @@ body {
   margin: 10px 0 6px;
 }
 
+/* Neutral, not accent. A data point drawn in the interaction colour looks
+   draggable, and §2 says a series must never be mistakable for a control. */
 .exposure-base {
   position: absolute;
   top: -3px;
   width: 10px;
   height: 10px;
-  border-radius: 999px;
-  background: var(--accent-fill);
-  transform: translateX(-50%);
+  border-radius: 2px;
+  background: var(--fg-default);
+  transform: translateX(-50%) rotate(45deg);
 }
 
 .assumption {
@@ -582,9 +875,55 @@ kbd {
   .peek {
     width: 100vw;
   }
-  .gap-row-meta {
-    flex-wrap: wrap;
-    gap: 8px;
+  /* Below this width the figures cannot hold their own column without
+     squeezing the title to nothing, so they move under it and left-align. */
+  .gap-row {
+    grid-template-columns: 3px minmax(0, 1fr);
+  }
+  .gap-side {
+    grid-column: 2;
+    align-items: flex-start;
+    text-align: left;
+    margin-top: 7px;
+  }
+  .gap-action-rationale {
+    display: none;
+  }
+  /* The action title is a sentence, so on a phone it wraps rather than being
+     forced onto one line and pushing the document sideways. */
+  .gap-action-title {
+    white-space: normal;
+  }
+  /* The title said what the problem was and was the only thing truncated,
+     while the metadata below it wrapped freely to three lines. Two lines of
+     title, and the low-value metadata goes to the peek instead. */
+  .gap-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .gap-meta-secondary {
+    display: none;
+  }
+  /* §5: 48px minimum targets on a touch surface. The rail was giving them 28,
+     the severity pills 24 and the view tabs 25 — all of them under even the
+     44px WCAG floor, on the one surface the rule actually governs. */
+  .nav-item,
+  .sev-pill,
+  .view-tab,
+  .theme-toggle,
+  .filter-clear,
+  .control {
+    min-height: 48px;
+  }
+  .sev-pill,
+  .view-tab {
+    padding: 0 12px;
+  }
+  .topbar h1 {
+    font-size: var(--text-lg);
   }
 }
 
@@ -597,8 +936,9 @@ kbd {
   min-width: 0;
 }
 
-.gap-row-top,
-.gap-title {
+.gap-main,
+.gap-title,
+.gap-action {
   min-width: 0;
 }
 
@@ -696,7 +1036,8 @@ textarea.control {
 }
 
 .search {
-  min-width: 240px;
+  flex: 1 1 200px;
+  min-width: 0;
   cursor: text;
 }
 
@@ -791,31 +1132,27 @@ textarea.control {
   color: var(--fg-default);
 }
 
-/* Source state uses the same status ramp as severity, and every chip carries a
-   glyph — `fixture` must be legible as "not connected", not as a colour. */
+/* Source state uses the same status ramp as severity and the same dot-plus-word
+   treatment — `fixture` must be legible as "not connected", not as a colour. */
 .chip-source-healthy {
-  color: var(--status-low-400);
-  border-color: var(--status-low-700);
+  border-color: var(--status-low-border);
+}
+.chip-source-healthy .chip-dot {
+  background: var(--status-low);
+}
+.chip-source-degraded .chip-dot,
+.chip-source-stale .chip-dot {
+  background: var(--status-high);
 }
 .chip-source-degraded,
 .chip-source-stale {
-  color: var(--status-high-400);
-  border-color: var(--status-high-700);
+  border-color: var(--status-high-border);
 }
 .chip-source-failing {
-  color: var(--status-critical-400);
-  border-color: var(--status-critical-700);
+  border-color: var(--status-critical-border);
 }
-
-:root[data-theme="light"] .chip-source-healthy {
-  color: var(--status-low-700);
-}
-:root[data-theme="light"] .chip-source-degraded,
-:root[data-theme="light"] .chip-source-stale {
-  color: var(--status-high-700);
-}
-:root[data-theme="light"] .chip-source-failing {
-  color: var(--status-critical-700);
+.chip-source-failing .chip-dot {
+  background: var(--status-critical);
 }
 
 /* --- metrics -------------------------------------------------------------- */
@@ -905,4 +1242,141 @@ textarea.control {
   .detail-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* --- toolbar count and filter chip --------------------------------------- */
+
+.toolbar-count {
+  color: var(--fg-subtle);
+}
+
+.filter-clear {
+  font: inherit;
+  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  color: var(--fg-default);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.filter-clear:hover {
+  border-color: var(--fg-subtle);
+}
+
+/* --- theme toggle --------------------------------------------------------- */
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: var(--text-xs);
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--fg-default);
+  border-color: var(--border-strong);
+}
+
+/* --- group header extras -------------------------------------------------- */
+
+.group-header-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  flex: none;
+}
+
+.group-header-critical .group-header-dot {
+  background: var(--status-critical);
+}
+.group-header-high .group-header-dot {
+  background: var(--status-high);
+}
+.group-header-medium .group-header-dot {
+  background: var(--status-medium);
+}
+.group-header-low .group-header-dot {
+  background: var(--status-low);
+}
+
+.group-header-exposure {
+  color: var(--fg-muted);
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+}
+
+.group-header-band {
+  color: var(--fg-subtle);
+}
+
+/* --- the modelled key ----------------------------------------------------- */
+
+/* One sentence, once per route. Without it the ▨ is folklore: a reader has no
+   way to learn that the exposure is a model output while the percentages in
+   the row titles are counts. */
+.modelled-key {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+}
+
+/* --- wide tables ---------------------------------------------------------- */
+
+/* §9 requires reflow to 320px with no horizontal page scroll. A table that
+   cannot compress scrolls inside its own container instead of pushing the
+   document sideways. */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* --- refusals and primary actions ---------------------------------------- */
+
+.action-refusal {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--status-critical);
+  font-weight: 500;
+}
+
+textarea.control[aria-invalid="true"] {
+  border-color: var(--status-critical);
+}
+
+/* §2: accent is reserved for interaction — and no control in the product was
+   using it, while the exposure band's base marker was drawn in it. The advance
+   action is the one thing on a gap you are most likely to want, so it is the
+   one thing that gets the fill. Near-black on orange, never white: white
+   measures 3.90:1 and fails AA. */
+.control-primary {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.control-primary:hover:not(:disabled) {
+  border-color: var(--accent-fill);
+  filter: brightness(1.08);
 }

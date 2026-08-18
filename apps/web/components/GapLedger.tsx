@@ -19,15 +19,46 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoGap, Severity } from "@/lib/demo-gaps";
 import { groupBySeverity } from "@/lib/demo-gaps";
-import { ConfidenceMeter, ExposureCell, SeverityChip, StatusChip } from "./chips";
 import { PeekPanel } from "./PeekPanel";
-import { age, shortDate } from "@/lib/format";
+import { GapRow } from "./GapRow";
+import { count, exposureRange } from "@/lib/format";
+import { summarise } from "@/lib/situation";
+import { ModelledMark } from "./chips";
 import type { AuditEntry } from "@/lib/ledger-state";
 import type { TransitionRequest } from "./TransitionControls";
 
 interface IndexedGroup {
   severity: Severity;
   rows: { gap: DemoGap; index: number }[];
+}
+
+/**
+ * The band above each severity group.
+ *
+ * It carries the group's own exposure envelope, not just a count. The reader is
+ * deciding whether this group is worth scanning at all, and "critical · 4" does
+ * not help them do that while "critical · 4 · £6,150–£12,710" does. The
+ * envelope obeys the same rules as every other one on screen, because it is
+ * computed by the same function — a subtotal assembled here by hand would be
+ * free to sum bases and drop the confidence band.
+ */
+function GroupHeader({ severity, gaps }: { severity: Severity; gaps: DemoGap[] }) {
+  const { exposure } = summarise(gaps);
+  return (
+    <h2 className={`group-header group-header-${severity}`}>
+      <span className="group-header-dot" aria-hidden="true" />
+      <span className="group-header-word">{severity}</span>
+      <span className="group-header-count tabular">{count(gaps.length)}</span>
+      {exposure.kind === "range" ? (
+        <span className="group-header-exposure tabular">
+          {exposure.isModelled ? <ModelledMark /> : null}
+          {exposureRange(exposure.low, exposure.high, exposure.currency)}
+          <span className="group-header-band"> · {exposure.band} confidence</span>
+        </span>
+      ) : null}
+      <span className="group-header-rule" aria-hidden="true" />
+    </h2>
+  );
 }
 
 /**
@@ -131,63 +162,30 @@ export function GapLedger({
       <div>
         {groups.map((group) => (
           <section key={group.severity} aria-label={`${group.severity} severity`}>
-            <h2 className="group-header">
-              {group.severity} · {group.rows.length}
-            </h2>
+            <GroupHeader severity={group.severity} gaps={group.rows.map((row) => row.gap)} />
             <ul className="gap-list">
               {group.rows.map(({ gap, index }) => (
                 <li key={gap.id}>
-                  <button
-                    type="button"
-                    className="gap-row"
-                    // aria-current, not aria-selected: aria-selected is not
-                    // valid on an implicit button role, and "this is the row
-                    // you are on" is what aria-current means.
-                    aria-current={index === activeIndex ? "true" : undefined}
-                    ref={(element) => {
-                      rowRefs.current[index] = element;
-                    }}
-                    onClick={() => {
+                  <GapRow
+                    gap={gap}
+                    active={index === activeIndex}
+                    onActivate={() => {
                       setActiveIndex(index);
                       setPeekOpen(true);
                     }}
                     onFocus={() => setActiveIndex(index)}
-                  >
-                    <span className="gap-row-top">
-                      <SeverityChip severity={gap.severity} />
-                      <span className="gap-title">{gap.title}</span>
-                      <span className="gap-ref">{gap.reference}</span>
-                    </span>
-                    <span className="gap-row-meta tabular">
-                      <span className="gap-scope">{gap.gapTypeLabel}</span>
-                      <span className="gap-scope">{gap.scopeId}</span>
-                      {/* Exposure and confidence are adjacent by construction —
-                          see design-concepts.md, information hierarchy. */}
-                      <ExposureCell gap={gap} />
-                      <ConfidenceMeter band={gap.confidenceBand} score={gap.confidenceScore} />
-                      {/* The age of the newest contributing source record, not
-                          the row's write time. "How old is what this is based
-                          on" is the triage question; the write time is always
-                          now and tells nobody anything. */}
-                      <span>
-                        {gap.dataFreshnessSeconds === null
-                          ? "age unknown"
-                          : `${age(gap.dataFreshnessSeconds)} old`}
-                      </span>
-                      <StatusChip status={gap.status} />
-                      <span>{gap.ownerInitials ?? "—"}</span>
-                      <span className="gap-scope">1st: {shortDate(gap.firstSeenAt)}</span>
-                    </span>
-                  </button>
+                    rowRef={(element) => {
+                      rowRefs.current[index] = element;
+                    }}
+                  />
                 </li>
               ))}
             </ul>
           </section>
         ))}
         <p className="keyboard-hint">
-          <kbd>J</kbd> <kbd>K</kbd> move · <kbd>Space</kbd> peek · <kbd>Esc</kbd> close. Assign and
-          status live in the peek. Bulk select, the command menu and the detail route arrive with
-          the rest of Phase E.
+          <kbd>J</kbd> <kbd>K</kbd> move · <kbd>Space</kbd> peek · <kbd>Enter</kbd> open ·{" "}
+          <kbd>Esc</kbd> close. Assign and status live in the peek.
         </p>
       </div>
       {peekOpen && active ? (

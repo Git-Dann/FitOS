@@ -131,3 +131,15 @@ states — a passing happy path is not completion.
 Fresh session per phase. End every session by updating `docs/build-state.md`, running the phase
 checks, committing, and printing the exact prompt for the next session. Never mark a phase complete
 while its acceptance checks fail.
+
+## UI verification
+
+`apps/web/scripts/serve.sh <port>` builds and serves the standalone output, printing the build id it
+is actually serving. `next start` does not work with `output: standalone` and fails by answering 200
+while 500ing its own assets — two rounds of this build were reviewed against the wrong bits that way.
+
+`apps/web/scripts/capture.mjs <base> <outDir>` captures the review set at 1440 × 900, 1024 × 768 and
+390 × 844 in **both themes**, and refuses to write anything if the page it captured is not the page
+it meant to capture. It asserts, rather than leaving to the eye: no console errors, no horizontal
+overflow at 390 or 320 (§9 reflow), no touch target under 44px on the frontline mobile surface, and
+no currency figure surviving into a frontline payload.
