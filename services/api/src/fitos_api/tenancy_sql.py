@@ -60,6 +60,9 @@ TABLE_GRANTS: dict[str, str] = {
     # result, and a deletable outcome table turns the ledger into a
     # success-reporting instrument by making the disappointing ones removable.
     "gap_outcomes": "SELECT, INSERT",
+    # A run record you can remove is a run record that cannot answer "why
+    # did this gap stop firing".
+    "detector_runs": "SELECT, INSERT",
 }
 
 NO_DELETE_TABLES: tuple[str, ...] = (
@@ -72,6 +75,7 @@ NO_DELETE_TABLES: tuple[str, ...] = (
     "webhook_deliveries",
     "gap_actions",
     "gap_outcomes",
+    "detector_runs",
 )
 
 ORG_SCOPED_TABLES: tuple[str, ...] = tuple(TABLE_GRANTS)

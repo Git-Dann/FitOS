@@ -99,21 +99,40 @@ class PipelineResult:
     def updates(self) -> tuple[DedupeOutcome, ...]:
         return tuple(o for o in self.outcomes if o.decision is DedupeDecision.UPDATE)
 
+    # Typed accessors rather than only a dict. The persistence layer needs
+    # these counts as integers, and reaching into an untyped record for them
+    # means every caller casts — which is how a count ends up in the wrong
+    # column with nothing to catch it.
+    @property
+    def candidates_produced(self) -> int:
+        return len(self.outcomes)
+
+    @property
+    def candidates_suppressed(self) -> int:
+        return len(self.suppressed)
+
+    @property
+    def correlations_linked(self) -> int:
+        return len(self.correlations)
+
+    def dedupe_decisions(self) -> list[dict[str, str | None]]:
+        return [
+            {
+                "dedupe_key": o.dedupe_key,
+                "decision": o.decision.value,
+                "existing_gap_id": str(o.existing_gap_id) if o.existing_gap_id else None,
+            }
+            for o in self.outcomes
+        ]
+
     def to_record(self) -> dict[str, object]:
         return {
-            "candidates_produced": len(self.outcomes),
-            "candidates_suppressed": len(self.suppressed),
+            "candidates_produced": self.candidates_produced,
+            "candidates_suppressed": self.candidates_suppressed,
             "dedupe_created": len(self.creates),
             "dedupe_updated": len(self.updates),
-            "correlations_linked": len(self.correlations),
-            "dedupe_decisions": [
-                {
-                    "dedupe_key": o.dedupe_key,
-                    "decision": o.decision.value,
-                    "existing_gap_id": str(o.existing_gap_id) if o.existing_gap_id else None,
-                }
-                for o in self.outcomes
-            ],
+            "correlations_linked": self.correlations_linked,
+            "dedupe_decisions": self.dedupe_decisions(),
         }
 
 

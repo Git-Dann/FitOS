@@ -456,6 +456,14 @@ class DetectorRunResult:
     def succeeded(self) -> bool:
         return not self.errors
 
+    def query_hash_list(self) -> list[str]:
+        """Every distinct query behind this run's candidates, sorted.
+
+        Typed rather than only reachable through `to_record()`, so the caller
+        that persists it is not casting `object` into a JSON column.
+        """
+        return sorted({ref.query_hash for c in self.candidates for ref in c.evidence})
+
     def to_record(self) -> dict[str, Any]:
         """The persisted run record.
 

@@ -959,6 +959,7 @@ name = "fitos-worker"
 version = "0.0.0"
 source = { editable = "services/worker" }
 dependencies = [
+    { name = "fitos-api" },
     { name = "fitos-connector-csv" },
     { name = "fitos-connector-sdk" },
     { name = "fitos-data" },
@@ -967,6 +968,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "fitos-api", editable = "services/api" },
     { name = "fitos-connector-csv", editable = "connectors/csv_upload" },
     { name = "fitos-connector-sdk", editable = "connectors/sdk" },
     { name = "fitos-data", editable = "data" },

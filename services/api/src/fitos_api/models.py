@@ -772,3 +772,64 @@ class GapOutcome(Base):
         CheckConstraint("metric_version >= 1", name="ck_outcome_metric_version"),
         Index("ix_gap_outcomes_org_gap", "organization_id", "gap_id"),
     )
+
+
+class DetectorRun(Base):
+    """One detector execution, recorded whether or not it found anything.
+
+    `readings_considered` and `insufficient_readings` are separate columns on
+    purpose. A run that examined four hundred readings and refused three
+    hundred and ninety-nine for thin samples produces zero gaps, and so does a
+    clean run over healthy data. Without both numbers the two are
+    indistinguishable, and only one of them means the estate is fine.
+    """
+
+    __tablename__ = "detector_runs"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+
+    detector_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    pack_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    rule_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    rule_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    config_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    window_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    readings_considered: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    insufficient_readings: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    candidates_produced: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    candidates_suppressed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    gaps_created: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    gaps_updated: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    correlations_linked: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+    query_hashes: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    dedupe_decisions: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    thresholds: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    errors: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    skipped_reason: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        CheckConstraint("window_start < window_end", name="ck_detector_run_window_ordered"),
+        CheckConstraint("duration_ms >= 0", name="ck_detector_run_duration"),
+        CheckConstraint(
+            "insufficient_readings <= readings_considered",
+            name="ck_detector_run_refusals_within_readings",
+        ),
+        Index("ix_detector_runs_org_time", "organization_id", "finished_at"),
+        Index("ix_detector_runs_org_rule", "organization_id", "rule_id", "rule_version"),
+    )
