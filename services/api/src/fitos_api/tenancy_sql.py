@@ -45,9 +45,24 @@ TABLE_GRANTS: dict[str, str] = {
     "audit_events": "SELECT, INSERT",
     "gaps": "SELECT, INSERT, UPDATE",
     "invitations": "SELECT, INSERT, UPDATE",
+    "connections": "SELECT, INSERT, UPDATE, DELETE",
+    # Versions, runs, rejections and deliveries are all records of what
+    # happened. A record you can delete is a record you cannot rely on.
+    "mapping_versions": "SELECT, INSERT, UPDATE",
+    "connector_runs": "SELECT, INSERT, UPDATE",
+    "quarantined_records": "SELECT, INSERT, UPDATE",
+    "webhook_deliveries": "SELECT, INSERT",
 }
 
-NO_DELETE_TABLES: tuple[str, ...] = ("audit_events", "gaps", "invitations")
+NO_DELETE_TABLES: tuple[str, ...] = (
+    "audit_events",
+    "gaps",
+    "invitations",
+    "mapping_versions",
+    "connector_runs",
+    "quarantined_records",
+    "webhook_deliveries",
+)
 
 ORG_SCOPED_TABLES: tuple[str, ...] = tuple(TABLE_GRANTS)
 
@@ -147,6 +162,7 @@ def all_statements(app_password: str) -> list[str]:
         *grants_for(*ORG_SCOPED_TABLES),
         *enable_rls(*tables),
         *user_organizations_statements(),
+        *data_plane_trigger_statements(),
     ]
 
 
@@ -198,3 +214,82 @@ def user_organizations_statements() -> list[str]:
         "REVOKE ALL ON FUNCTION user_organizations(uuid) FROM PUBLIC;",
         f"GRANT EXECUTE ON FUNCTION user_organizations(uuid) TO {APP_ROLE};",
     ]
+
+
+# ---------------------------------------------------------------------------
+# Triggers: the rules a CHECK constraint cannot express
+# ---------------------------------------------------------------------------
+#
+# A CHECK sees one row at a time and cannot compare OLD with NEW, so "this
+# column must not change" is beyond it. Both rules below are that shape.
+#
+# They live here, next to the policies, for the same reason those do: the test
+# fixture builds its schema from `Base.metadata`, which carries constraints and
+# indexes but no triggers. A trigger defined only inside a migration is a
+# trigger the tests cannot prove — exactly how `uq_gap_dedupe_open` slipped
+# through in Phase B. One definition, applied by both paths, and
+# `test_the_migration_creates_every_trigger` fails if they diverge.
+
+FREEZE_APPLIED_MAPPING = """
+CREATE OR REPLACE FUNCTION mapping_versions_freeze_applied()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF OLD.applied_at IS NOT NULL THEN
+    IF NEW.column_map IS DISTINCT FROM OLD.column_map
+       OR NEW.required_columns IS DISTINCT FROM OLD.required_columns
+       OR NEW.transforms IS DISTINCT FROM OLD.transforms
+       OR NEW.target_table IS DISTINCT FROM OLD.target_table
+       OR NEW.version IS DISTINCT FROM OLD.version
+       OR NEW.resource IS DISTINCT FROM OLD.resource THEN
+      RAISE EXCEPTION
+        'mapping version % has been applied and cannot be edited; '
+        'create a new version instead', OLD.version
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+"""
+
+FREEZE_FINISHED_RUN = """
+CREATE OR REPLACE FUNCTION connector_runs_no_count_rewrite()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF OLD.finished_at IS NOT NULL THEN
+    IF NEW.records_read IS DISTINCT FROM OLD.records_read
+       OR NEW.records_written IS DISTINCT FROM OLD.records_written
+       OR NEW.records_quarantined IS DISTINCT FROM OLD.records_quarantined
+       OR NEW.outcome IS DISTINCT FROM OLD.outcome THEN
+      RAISE EXCEPTION
+        'run % has finished; its counts and outcome are final', OLD.id
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+"""
+
+# (trigger name, table, function) — asserted against pg_trigger by the tests.
+DATA_PLANE_TRIGGERS: tuple[tuple[str, str, str], ...] = (
+    ("mapping_versions_freeze_applied", "mapping_versions", "mapping_versions_freeze_applied"),
+    ("connector_runs_no_count_rewrite", "connector_runs", "connector_runs_no_count_rewrite"),
+)
+
+
+def data_plane_trigger_statements() -> list[str]:
+    statements = [FREEZE_APPLIED_MAPPING, FREEZE_FINISHED_RUN]
+    for name, table, function in DATA_PLANE_TRIGGERS:
+        statements.append(f"DROP TRIGGER IF EXISTS {name} ON {table};")
+        statements.append(
+            f"CREATE TRIGGER {name} BEFORE UPDATE ON {table} "
+            f"FOR EACH ROW EXECUTE FUNCTION {function}();"
+        )
+    return statements

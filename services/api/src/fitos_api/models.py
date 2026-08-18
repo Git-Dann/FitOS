@@ -382,3 +382,267 @@ class Gap(Base):
             postgresql_where=text("status NOT IN ('resolved', 'dismissed')"),
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# The data plane (Phase C)
+# ---------------------------------------------------------------------------
+
+
+class Connection(Base):
+    """One configured source for one organization.
+
+    `config` holds settings and **never secrets**. Secrets live in the secret
+    manager and reach a connector through the resolver on ConnectorContext, so
+    a database backup, a support export or a stray log of this row yields
+    nothing usable. `ck_connection_config_has_no_secrets` is the structural
+    version of that promise: a config containing a key that looks like a
+    credential is refused by the database rather than by a code review.
+    """
+
+    __tablename__ = "connections"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    connector_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    connector_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="configured")
+    is_fixture: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    last_successful_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expected_cadence_seconds: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "name", name="uq_connection_org_name"),
+        CheckConstraint(
+            "status IN ('configured','testing','syncing','healthy','delayed',"
+            "'schema_changed','failed','disabled','fixture')",
+            name="ck_connection_status",
+        ),
+        # A fixture connection is never dressed as healthy. The connector card
+        # shows real state, and this is the rule made unbreakable.
+        CheckConstraint(
+            "NOT (is_fixture AND status = 'healthy')",
+            name="ck_connection_fixture_is_not_healthy",
+        ),
+        CheckConstraint(
+            "NOT (config::text ~* '(password|secret|token|api[_-]?key|private[_-]?key)')",
+            name="ck_connection_config_has_no_secrets",
+        ),
+        Index("ix_connections_org", "organization_id"),
+    )
+
+
+class MappingVersion(Base):
+    """How a source record becomes a staging row, versioned and immutable.
+
+    Immutable is the point. A correction is a *new* version applied forward over
+    the same raw objects, never an edit of the one that produced the numbers
+    somebody already acted on. Freezing an applied version needs to compare the
+    old row with the new one, which a CHECK constraint cannot do, so it is a
+    trigger — `mapping_versions_freeze_applied` in migration 0005. Only
+    `is_active` may change afterwards, which is what makes rollback possible
+    without making history editable.
+
+    Exactly one version per (connection, resource) is active, enforced by a
+    partial unique index rather than by application code — two active mappings
+    means two answers to "how was this row produced".
+    """
+
+    __tablename__ = "mapping_versions"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("connections.id", ondelete="CASCADE"), nullable=False
+    )
+    resource: Mapped[str] = mapped_column(String(64), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    column_map: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    required_columns: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    transforms: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    target_table: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by_membership_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "connection_id", "resource", "version", name="uq_mapping_connection_resource_version"
+        ),
+        CheckConstraint("version >= 1", name="ck_mapping_version_positive"),
+        CheckConstraint(
+            "jsonb_typeof(column_map) = 'object' AND column_map <> '{}'::jsonb",
+            name="ck_mapping_has_columns",
+        ),
+        # An active version must have been applied, and vice versa. Otherwise
+        # "which mapping is live" and "which mapping ran" can disagree.
+        CheckConstraint("is_active = (applied_at IS NOT NULL)", name="ck_mapping_active_applied"),
+        Index(
+            "uq_mapping_one_active_per_resource",
+            "connection_id",
+            "resource",
+            unique=True,
+            postgresql_where=text("is_active"),
+        ),
+        Index("ix_mapping_versions_org", "organization_id"),
+    )
+
+
+class ConnectorRun(Base):
+    """The record of one extraction. Append-only, like the audit log.
+
+    Every count here answers a question somebody asks during an incident, and
+    `records_quarantined` is not nullable on purpose: a run that cannot say how
+    many records it rejected is a run reporting a number nobody should trust.
+    """
+
+    __tablename__ = "connector_runs"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("connections.id", ondelete="CASCADE"), nullable=False
+    )
+    connector_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    connector_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    mapping_version: Mapped[int | None] = mapped_column(Integer)
+    trigger: Mapped[str] = mapped_column(String(20), nullable=False, server_default="manual")
+    outcome: Mapped[str] = mapped_column(String(16), nullable=False, server_default="running")
+    records_read: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    records_written: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    records_quarantined: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    rate_limit_waits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    retries: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    checkpoint: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    resources: Mapped[list[Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    secrets_used: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    error: Mapped[str | None] = mapped_column(Text)
+    trace_id: Mapped[str | None] = mapped_column(String(64))
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(
+            "outcome IN ('running','succeeded','partial','failed')", name="ck_run_outcome"
+        ),
+        CheckConstraint(
+            "trigger IN ('manual','schedule','webhook','backfill')", name="ck_run_trigger"
+        ),
+        CheckConstraint(
+            "records_read >= 0 AND records_written >= 0 AND records_quarantined >= 0",
+            name="ck_run_counts_non_negative",
+        ),
+        # A finished run has an end time; a running one does not. Without this,
+        # "how long did it take" has no reliable answer.
+        CheckConstraint("(outcome = 'running') = (finished_at IS NULL)", name="ck_run_finished_at"),
+        # A failure has to say why. A failed run with no error is an incident
+        # with no starting point.
+        CheckConstraint("outcome <> 'failed' OR error IS NOT NULL", name="ck_run_failed_has_error"),
+        Index("ix_runs_org_started", "organization_id", "started_at"),
+        Index("ix_runs_connection", "connection_id", "started_at"),
+    )
+
+
+class QuarantinedRecord(Base):
+    """A rejected record, kept with its reason and its mapping version.
+
+    Kept rather than dropped, because silent rejection is prohibited, and
+    because a mapping fix is applied forward — which needs the rejected records
+    to still exist to be re-run against.
+    """
+
+    __tablename__ = "quarantined_records"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("connector_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    connector_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    resource: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_record_id: Mapped[str] = mapped_column(String(400), nullable=False)
+    raw_ref: Mapped[str] = mapped_column(Text, nullable=False)
+    mapping_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    reasons: Mapped[list[Any]] = mapped_column(JSONB, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    quarantined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        # A quarantine entry with no reason is a rejection nobody can act on.
+        CheckConstraint("jsonb_array_length(reasons) > 0", name="ck_quarantine_has_reason"),
+        # And it must still point at the bytes, or it cannot be investigated.
+        CheckConstraint("raw_ref <> ''", name="ck_quarantine_has_raw_ref"),
+        Index("ix_quarantine_org_run", "organization_id", "run_id"),
+        Index("ix_quarantine_org_time", "organization_id", "quarantined_at"),
+    )
+
+
+class WebhookDelivery(Base):
+    """Every delivery seen, once. This is release gate 8, as a table.
+
+    The unique constraint is the whole mechanism. Checking for an existing row
+    and then inserting is a race two workers lose together: both see "not
+    seen", both insert, and the duplicate the check existed to prevent happens
+    anyway. `INSERT ... ON CONFLICT DO NOTHING` and the constraint make the
+    decision atomic.
+
+    Keyed per organization, because sources number their deliveries from 1 for
+    everybody and two tenants will collide on day one.
+    """
+
+    __tablename__ = "webhook_deliveries"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    connector_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    delivery_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    raw_ref: Mapped[str | None] = mapped_column(Text)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "connector_key",
+            "delivery_id",
+            name="uq_webhook_delivery_once",
+        ),
+        Index("ix_webhook_deliveries_org_time", "organization_id", "received_at"),
+    )

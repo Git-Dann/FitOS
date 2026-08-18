@@ -11,7 +11,11 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "alembic>=1.14",
   "pyjwt[crypto]>=2.10",
+  "fitos-connector-sdk",
 ]
+
+[tool.uv.sources]
+fitos-connector-sdk = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

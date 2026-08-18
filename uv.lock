@@ -379,6 +379,7 @@ source = { editable = "services/api" }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "fitos-connector-sdk" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic", extra = ["email"] },
     { name = "pydantic-settings" },
@@ -391,6 +392,7 @@ dependencies = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.14" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "fitos-connector-sdk", editable = "connectors/sdk" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.10" },
     { name = "pydantic-settings", specifier = ">=2.6" },

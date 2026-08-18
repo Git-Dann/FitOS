@@ -451,6 +451,14 @@ def test_every_route_that_touches_tenant_data_is_covered_by_a_cross_tenant_test(
         "/v1/memberships/{membership_id}",
         "/v1/invitations",
         "/v1/invitations/{invitation_id}/revoke",
+        # test_mappings.py: list scoping, 404 on read, 404 on apply and
+        # rollback, and 404 when naming another tenant's connection.
+        "/v1/mappings",
+        "/v1/mappings/{mapping_id}",
+        "/v1/mappings/{mapping_id}/preview",
+        "/v1/mappings/{mapping_id}/apply",
+        "/v1/mappings/{mapping_id}/rollback",
+        "/v1/mappings/{mapping_id}/compare/{other_id}",
     }
     # Routes that deliberately run without a tenant scope, and where the
     # cross-tenant reasoning lives.

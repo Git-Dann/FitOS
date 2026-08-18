@@ -313,3 +313,52 @@ def test_a_role_is_created_before_it_is_granted_anything() -> None:
         create_index = next(i for i, s in enumerate(statements) if "CREATE ROLE" in s)
         grant_index = next(i for i, s in enumerate(statements) if "GRANT USAGE" in s)
         assert create_index < grant_index, statements
+
+
+def test_the_migration_creates_every_trigger_the_code_declares(migrated_database: str) -> None:
+    """Triggers are the third thing that can drift, after tables and indexes.
+
+    `Base.metadata` carries columns, constraints and indexes but no triggers, so
+    a trigger defined only inside a migration is invisible to the test fixture —
+    which is how an applied mapping version stayed editable in the test schema
+    while being frozen in production. Same failure shape as the dedupe index in
+    Phase B; this closes the third door.
+    """
+    from fitos_api.tenancy_sql import DATA_PLANE_TRIGGERS
+
+    engine = create_engine(migrated_database)
+    with engine.connect() as conn:
+        found = {
+            (row[0], row[1])
+            for row in conn.execute(
+                text(
+                    "SELECT t.tgname, c.relname FROM pg_trigger t "
+                    "JOIN pg_class c ON c.oid = t.tgrelid "
+                    "WHERE NOT t.tgisinternal"
+                )
+            ).all()
+        }
+    engine.dispose()
+
+    for name, table, _function in DATA_PLANE_TRIGGERS:
+        assert (name, table) in found, f"{name} is missing from {table} after migration"
+
+
+def test_the_trigger_functions_pin_their_search_path(migrated_database: str) -> None:
+    """A plpgsql trigger runs as the definer of its function.
+
+    Without a pinned search_path, an object shadowing one it references could
+    be resolved from a caller-controlled schema — the same escalation the
+    SECURITY DEFINER function guards against.
+    """
+    from fitos_api.tenancy_sql import DATA_PLANE_TRIGGERS
+
+    engine = create_engine(migrated_database)
+    with engine.connect() as conn:
+        for _name, _table, function in DATA_PLANE_TRIGGERS:
+            config = conn.execute(
+                text("SELECT proconfig FROM pg_proc WHERE proname = :p"), {"p": function}
+            ).scalar_one()
+            assert config is not None, f"{function} has no pinned search_path"
+            assert any(c.startswith("search_path=") for c in config), function
+    engine.dispose()
