@@ -1,9 +1,9 @@
 """Row-level security, as SQL.
 
-RLS cannot be expressed through the ORM, so it lives here as explicit
-statements and is applied by the migration. Keeping it in one module means
-"which tables are protected, and by what policy" has a single answer that can
-be read in thirty seconds.
+RLS cannot be expressed through the ORM, so it lives here as explicit statements
+and is applied by the migrations. Keeping it in one module means "which tables
+are protected, and by what policy" has a single answer that can be read in
+thirty seconds.
 
 `nullif(..., '')` is not cosmetic: after a rollback the setting is an empty
 string rather than unset, and `''::uuid` raises 22P02. Without the nullif the
@@ -13,46 +13,40 @@ unscoped query into a 500 rather than an empty result, and hides the mistake.
 The model:
 
   fitos_owner  owns the schema, runs migrations, is exempt from RLS.
-  fitos_app    the application role. NOBYPASSRLS. INSERT/SELECT only on audit.
+  fitos_app    the application role. NOBYPASSRLS, and no DELETE on the tables
+               whose whole purpose is to be a record: audit_events and gaps.
 
-Every org-scoped table is FORCE ROW LEVEL SECURITY so the policy applies even
-to the table owner, and every policy keys off `app.current_organization_id`,
-which db.organization_scope sets with SET LOCAL.
+Every org-scoped table is FORCE ROW LEVEL SECURITY so the policy applies even to
+the table owner.
+
+Each migration applies the statements for the tables *it* creates. `TABLE_GRANTS`
+is the full current picture, used by the test fixture, and
+`test_every_org_scoped_table_has_rls` fails if a table is added here without a
+policy — or added to the schema without being added here.
 """
 
 from __future__ import annotations
 
 import re
 
-# Tables carrying organization_id. Adding one without adding it here is caught
-# by test_every_org_scoped_table_has_rls.
-ORG_SCOPED_TABLES: tuple[str, ...] = ("memberships", "audit_events")
-
 APP_ROLE = "fitos_app"
 
-_TENANT_POLICY = """
-ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;
-ALTER TABLE {table} FORCE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS {table}_tenant_isolation ON {table};
-CREATE POLICY {table}_tenant_isolation ON {table}
-  USING (
-    organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid
-  )
-  WITH CHECK (
-    organization_id = nullif(current_setting('app.current_organization_id', true), '')::uuid
-  );
-"""
+# Tables carrying organization_id, with the privileges the application role gets.
+#
+# Note what is absent: DELETE on audit_events and gaps. A gap is dismissed, not
+# deleted — deleting one removes the record that it was ever raised, which is the
+# same repudiation problem the audit table has (docs/threat-model.md T13).
+TABLE_GRANTS: dict[str, str] = {
+    "memberships": "SELECT, INSERT, UPDATE, DELETE",
+    "audit_events": "SELECT, INSERT",
+    "gaps": "SELECT, INSERT, UPDATE",
+}
 
-# Organizations are not org-scoped by a column — the row *is* the organization.
-# A caller may only see the organization its token names.
-_ORGANIZATION_POLICY = """
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE organizations FORCE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS organizations_tenant_isolation ON organizations;
-CREATE POLICY organizations_tenant_isolation ON organizations
-  USING (id = nullif(current_setting('app.current_organization_id', true), '')::uuid)
-  WITH CHECK (id = nullif(current_setting('app.current_organization_id', true), '')::uuid);
-"""
+NO_DELETE_TABLES: tuple[str, ...] = ("audit_events", "gaps")
+
+ORG_SCOPED_TABLES: tuple[str, ...] = tuple(TABLE_GRANTS)
+
+_PASSWORD_PATTERN = re.compile(r"[A-Za-z0-9_.\-]{8,128}")
 
 
 def create_roles(app_password: str) -> list[str]:
@@ -61,18 +55,14 @@ def create_roles(app_password: str) -> list[str]:
     CREATE ROLE is DDL and cannot take a bound parameter, so the password is
     interpolated. It is validated first: a value containing a quote or a
     backslash could otherwise close the literal and append arbitrary SQL. The
-    password comes from configuration rather than a request, so this is
-    defence in depth, not the only control.
+    password comes from configuration rather than a request, so this is defence
+    in depth, not the only control.
     """
-    if not app_password or not re.fullmatch(r"[A-Za-z0-9_.\-]{8,128}", app_password):
+    if not app_password or not _PASSWORD_PATTERN.fullmatch(app_password):
         raise ValueError(
             "application role password must be 8-128 chars of [A-Za-z0-9_.-]; "
             "it is interpolated into DDL and must not be able to escape the literal"
         )
-    # S608 suppressed with cause: CREATE ROLE is DDL and takes no bound
-    # parameters. app_password is validated against a strict character class
-    # immediately above so it cannot terminate the literal, and APP_ROLE is a
-    # module constant, not input.
     create_role = (
         "DO $$ BEGIN "  # noqa: S608
         f"IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{APP_ROLE}') THEN "
@@ -80,28 +70,55 @@ def create_roles(app_password: str) -> list[str]:
         "NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS; "
         "END IF; END $$;"
     )
-    return [create_role]
+    return [f"GRANT USAGE ON SCHEMA public TO {APP_ROLE};", create_role]
 
 
-def grant_privileges() -> list[str]:
-    """Least privilege for the application role.
-
-    Note what audit_events does NOT get: UPDATE and DELETE. Retention deletion
-    runs under a separate credential and is itself audited.
-    """
-    return [
-        f"GRANT USAGE ON SCHEMA public TO {APP_ROLE};",
-        f"GRANT SELECT, INSERT, UPDATE, DELETE ON organizations, users, memberships TO {APP_ROLE};",
-        f"GRANT SELECT, INSERT ON audit_events TO {APP_ROLE};",
-        f"REVOKE UPDATE, DELETE, TRUNCATE ON audit_events FROM {APP_ROLE};",
-    ]
-
-
-def enable_rls() -> list[str]:
-    statements = [_ORGANIZATION_POLICY]
-    statements.extend(_TENANT_POLICY.format(table=t) for t in ORG_SCOPED_TABLES)
+def grants_for(*tables: str) -> list[str]:
+    """Least-privilege grants for the named tables."""
+    statements: list[str] = []
+    for table in tables:
+        privileges = TABLE_GRANTS.get(table, "SELECT, INSERT, UPDATE, DELETE")
+        statements.append(f"GRANT {privileges} ON {table} TO {APP_ROLE};")
+        if table in NO_DELETE_TABLES:
+            statements.append(f"REVOKE DELETE, TRUNCATE ON {table} FROM {APP_ROLE};")
     return statements
 
 
+def tenant_policy(table: str, *, column: str = "organization_id") -> str:
+    """Enable, force and define the isolation policy for one table.
+
+    `column` is `id` for `organizations`, where the row *is* the organization.
+    """
+    return f"""
+ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;
+ALTER TABLE {table} FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS {table}_tenant_isolation ON {table};
+CREATE POLICY {table}_tenant_isolation ON {table}
+  USING (
+    {column} = nullif(current_setting('app.current_organization_id', true), '')::uuid
+  )
+  WITH CHECK (
+    {column} = nullif(current_setting('app.current_organization_id', true), '')::uuid
+  );
+"""
+
+
+def enable_rls(*tables: str) -> list[str]:
+    return [
+        tenant_policy(t, column="id" if t == "organizations" else "organization_id") for t in tables
+    ]
+
+
 def all_statements(app_password: str) -> list[str]:
-    return [*create_roles(app_password), *grant_privileges(), *enable_rls()]
+    """Everything, for a schema built from metadata rather than migrations.
+
+    Used by the test fixture. Production applies the per-migration subsets, and
+    test_migrations.py asserts the two agree.
+    """
+    tables = ("organizations", *ORG_SCOPED_TABLES)
+    return [
+        *create_roles(app_password),
+        f"GRANT SELECT, INSERT, UPDATE, DELETE ON organizations, users TO {APP_ROLE};",
+        *grants_for(*ORG_SCOPED_TABLES),
+        *enable_rls(*tables),
+    ]

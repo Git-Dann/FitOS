@@ -13,11 +13,14 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
+    Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -139,3 +142,167 @@ class AuditEvent(Base):
     )
 
     __table_args__ = (Index("ix_audit_org_time", "organization_id", "occurred_at"),)
+
+
+# ---------------------------------------------------------------------------
+# Gaps
+#
+# The invariants in docs/gap-model.md are enforced as CHECK constraints, not as
+# service-layer validation. A rule that lives only in application code is a rule
+# that a migration script, a data fix or a future endpoint can bypass — and
+# "no gap without evidence" is not a guideline.
+# ---------------------------------------------------------------------------
+
+GAP_STATUSES = (
+    "detected",
+    "triaged",
+    "investigating",
+    "actioned",
+    "validating",
+    "resolved",
+    "dismissed",
+)
+TERMINAL_STATUSES = ("resolved", "dismissed")
+SEVERITIES = ("info", "low", "medium", "high", "critical")
+CONFIDENCE_BANDS = ("low", "medium", "high")
+UNITS = ("count", "ratio", "currency_minor", "seconds")
+
+
+class Gap(Base):
+    __tablename__ = "gaps"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    pack_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    gap_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+
+    scope_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    scope_id: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    # The *primary* metric. Contributing metrics live in evidence_refs — see
+    # docs/spec-review.md R4.
+    metric_definition_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    metric_version: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    observed_value: Mapped[float] = mapped_column(Numeric, nullable=False)
+    expected_value: Mapped[float] = mapped_column(Numeric, nullable=False)
+    absolute_delta: Mapped[float] = mapped_column(Numeric, nullable=False)
+    percentage_delta: Mapped[float | None] = mapped_column(Numeric)
+    unit: Mapped[str] = mapped_column(String(20), nullable=False)
+    currency: Mapped[str | None] = mapped_column(String(3))
+
+    exposure_low: Mapped[int | None] = mapped_column(BigInteger)
+    exposure_base: Mapped[int | None] = mapped_column(BigInteger)
+    exposure_high: Mapped[int | None] = mapped_column(BigInteger)
+
+    confidence_score: Mapped[float | None] = mapped_column(Numeric(4, 3))
+    confidence_band: Mapped[str | None] = mapped_column(String(10))
+    severity: Mapped[str] = mapped_column(String(10), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="detected")
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    as_of_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    data_freshness_seconds: Mapped[int | None] = mapped_column(Integer)
+
+    rule_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    rule_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    detector_run_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+
+    assumptions: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    evidence_refs: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    recommended_actions: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    reason_codes: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    dedupe_key: Mapped[str] = mapped_column(String(128), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outcome_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+
+    __table_args__ = (
+        CheckConstraint(f"status IN {GAP_STATUSES!r}", name="ck_gap_status"),
+        CheckConstraint(f"severity IN {SEVERITIES!r}", name="ck_gap_severity"),
+        CheckConstraint(f"unit IN {UNITS!r}", name="ck_gap_unit"),
+        CheckConstraint(
+            "confidence_band IS NULL OR confidence_band IN ('low','medium','high')",
+            name="ck_gap_confidence_band",
+        ),
+        # Invariant 1 — no gap without evidence.
+        CheckConstraint("jsonb_array_length(evidence_refs) > 0", name="ck_gap_has_evidence"),
+        # Invariant 2 — modelled money is a range with assumptions, or absent.
+        CheckConstraint(
+            "(exposure_low IS NULL AND exposure_base IS NULL AND exposure_high IS NULL) "
+            "OR (exposure_low IS NOT NULL AND exposure_base IS NOT NULL "
+            "AND exposure_high IS NOT NULL)",
+            name="ck_gap_exposure_all_or_none",
+        ),
+        CheckConstraint(
+            "exposure_low IS NULL OR (exposure_low <= exposure_base "
+            "AND exposure_base <= exposure_high)",
+            name="ck_gap_exposure_ordered",
+        ),
+        CheckConstraint(
+            "exposure_base IS NULL OR currency IS NOT NULL", name="ck_gap_exposure_has_currency"
+        ),
+        CheckConstraint(
+            "exposure_base IS NULL OR jsonb_array_length(assumptions) > 0",
+            name="ck_gap_exposure_has_assumptions",
+        ),
+        # Invariant 3 — a modelled value always carries its confidence.
+        CheckConstraint(
+            "exposure_base IS NULL OR confidence_score IS NOT NULL",
+            name="ck_gap_exposure_has_confidence",
+        ),
+        CheckConstraint(
+            "confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)",
+            name="ck_gap_confidence_range",
+        ),
+        # Invariant 4 — terminal timestamps match terminal status.
+        CheckConstraint(
+            "(status = 'resolved') = (resolved_at IS NOT NULL)", name="ck_gap_resolved_at"
+        ),
+        CheckConstraint(
+            "(status = 'dismissed') = (dismissed_at IS NOT NULL)", name="ck_gap_dismissed_at"
+        ),
+        CheckConstraint(
+            "status <> 'resolved' OR outcome_id IS NOT NULL", name="ck_gap_resolved_has_outcome"
+        ),
+        # Invariant 5 — the observation window is coherent.
+        CheckConstraint(
+            "first_seen_at <= last_seen_at AND last_seen_at <= as_of_at",
+            name="ck_gap_timeline_ordered",
+        ),
+        Index("ix_gaps_org_status", "organization_id", "status"),
+        Index("ix_gaps_org_exposure", "organization_id", "exposure_base"),
+        # Invariant 6 - the same finding is not raised twice while it is still
+        # open. Partial, not total: once a gap is resolved or dismissed the same
+        # condition recurring is a new gap and must be raisable again.
+        #
+        # This is declared here as well as in migration 0002 because the test
+        # fixture builds its schema from this metadata. An index that exists only
+        # in the migration is an index the tests cannot prove;
+        # test_the_migration_creates_every_index_the_models_declare keeps the two
+        # honest.
+        Index(
+            "uq_gap_dedupe_open",
+            "organization_id",
+            "dedupe_key",
+            unique=True,
+            postgresql_where=text("status NOT IN ('resolved', 'dismissed')"),
+        ),
+    )
