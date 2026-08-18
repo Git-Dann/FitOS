@@ -7,10 +7,15 @@ before starting a phase. Read only the ADRs and code that phase needs.
 
 ## Current state
 
-Phase A is complete: the pnpm + Turborepo monorepo and the `uv` Python workspace exist, and
-`pnpm verify` passes. Product code does not exist yet — the phase plan is in
+Phases A and B are complete. The monorepo, the `uv` Python workspace, tenancy with PostgreSQL RLS,
+capability-based authorisation, the Gap aggregate, invitations and Better Auth are in place, and
+`pnpm verify` passes. Phase C (the data plane) has not started — the phase plan is in
 [docs/implementation-plan.md](docs/implementation-plan.md), live status in
 [docs/build-state.md](docs/build-state.md).
+
+Every environment variable is documented in [docs/configuration.md](docs/configuration.md).
+Migrations need `FITOS_APP_ROLE_PASSWORD` and `FITOS_AUTH_ROLE_PASSWORD`; neither has a default,
+because a default here becomes a production credential.
 
 Do not assume a command works because this file or a spec document mentions it. Commands not
 yet implemented exit non-zero with an "added in Phase X" message; that is deliberate.
@@ -25,6 +30,7 @@ yet implemented exit non-zero with an "added in Phase X" message; that is delibe
 | `pnpm dev` | web on :3000, api on :8000 |
 | `pnpm dev:infra` | Compose up, waits for health. **Authored but never started — no Docker daemon was available when it was written.** Verify before relying on it |
 | `pnpm test:tokens` | 31 contrast pairs across both themes |
+| `uv run pytest services/api/tests` | 132 tests. Needs `FITOS_TEST_DATABASE_URL`; without it the tenancy suite **skips**, so set `FITOS_REQUIRE_DB_TESTS=1` to turn a skip into a failure |
 | `pnpm lint:py` · `typecheck:py` · `test:unit:py` | ruff · mypy · pytest |
 
 ### Not yet implemented
@@ -70,6 +76,9 @@ passes 3/3. Do not reformat this tree — it is preserved, not maintained.
 - **No causal claim** from correlation. Only a `controlled_test` outcome may use causal language.
 - **No fake status.** A connector card shows its real state; `fixture` is never dressed as `healthy`.
 - **No placeholder buttons** on a route marked complete.
+- **No guard without a test that it fails.** A coverage check that finds nothing passes
+  everything, and looks exactly like one that works. Phase B shipped a cross-tenant route guard
+  that silently checked nothing for a whole phase.
 
 ## Destructive commands
 

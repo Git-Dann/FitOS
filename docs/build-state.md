@@ -6,233 +6,290 @@ Updated at the end of every session. Read this before starting a phase.
 
 ## current_phase
 
-Phase A — repository and local platform.
+Phase B — auth and tenancy.
 
 ## status
 
-**Complete, with two acceptance items that could not be verified in this environment.**
-Everything else was verified by execution. The exceptions are named in
-[open_risks](#open_risks) and repeated here rather than buried: this container has no
-Docker daemon, so Compose was authored and syntax-checked but never started, and the
-container footprint measurement has not been taken.
+**Acceptance checks pass. Two Phase A items remain unverified and now block Phase C.**
 
-CI **has** now run — see [CI run 1](#ci-run-1). It found three real high-severity
-advisories in the platform dependency graph on its first execution.
+All five Phase B acceptance criteria are met and each is backed by a test that has been run
+against real PostgreSQL rather than a mock — RLS cannot be exercised against a mock, and an
+untested RLS policy is worth nothing. 132 Python tests pass; `pnpm verify` exits 0.
 
-Session 1 (audit and specification) is complete and unchanged — see
-[session history](#session-history).
+The two open items are unchanged from Phase A and have the same single cause: this container has
+no Docker daemon, so Compose has never been started and the footprint has never been measured.
+Neither is a defect in the work. Both are listed as unverified rather than assumed good, and both
+gate Phase C, which needs ClickHouse, MinIO and Temporal actually running.
+
+This environment worked around the missing daemon by initialising a PostgreSQL 16.13 cluster
+directly from the server binaries at `/usr/lib/postgresql/16/bin` on port 5433. That is what made
+every tenancy claim below provable by execution. It does not close risk 1: one database is not the
+five-service Compose stack.
+
+## acceptance
+
+| # | Criterion | Evidence |
+| --- | --- | --- |
+| 1 | Cross-tenant negative tests for every implemented endpoint; 404 not 403 | `test_api_tenancy.py` (16), `test_invitations.py` (18). The coverage guard that enforces "a negative test in the same commit" was itself broken — see [the guard that saw nothing](#the-guard-that-saw-nothing). |
+| 2 | RLS blocks the query with the service-layer filter deliberately removed | `test_rls_alone_blocks_the_query`. Every list endpoint ships with no organization predicate at all, so this is not a contrived case — it is how the handlers are written. |
+| 3 | Capability checks everywhere; a lint rule fails on any role-name comparison | `tools/check_no_role_comparisons.py`, an AST checker, wired into `pnpm lint:py`. `test_guards.py` proves it flags equality and prefix matches, ignores prose, and passes on the real tree. |
+| 4 | Audit rows for every state transition; UPDATE and DELETE fail as the application role | `TestAuditIsAppendOnly`. Append-only by grant absence, not by trigger: the role holds `SELECT, INSERT` and nothing else. |
+| 5 | Startup fails if demo auth is enabled in production | `test_the_process_refuses_to_start_not_just_the_model_to_construct` runs a real interpreter and asserts the import fails, because a model that raises is not the same as a process that will not start. |
 
 ## completed_outcomes
 
-1. **Prototype preserved with history intact.** `git mv` into `legacy/fitos-prototype/`;
-   `git log --follow` traces `fulfilment-engine.ts` back to its creation commit `5009b01`.
-   The four design-QA screenshots moved to `docs/screenshots/legacy/`.
-2. **The Session 1 regression is fixed.** `legacy/fitos-prototype` `npm test` now runs
-   `build:vinext` and passes 3/3. It had failed on every commit since `0d530e2` (31 Jul).
-3. **pnpm + Turborepo workspace** with `apps/web` and `packages/{config,contracts,ui}`;
-   `uv` workspace with `services/{api,worker}`. Both lockfiles committed.
-4. **Legacy is outside the workspace** with its own lockfile, so its 16 high-severity
-   Cloudflare-toolchain advisories are not in the platform dependency graph
-   ([ADR 0008](adr/0008-hosting-target-and-legacy-runtime.md)).
-5. **Health and readiness probes that mean something.** `/ready` returns 503 when a
-   dependency is down, names which one, and reports the exception _type_ only — a test
-   asserts a DSN with an embedded password never reaches the response body.
-6. **The colour system is now code, not documentation.** `packages/ui` generates
-   `tokens.css` from `docs/design-tokens/tokens.json`; five tests assert the generated
-   CSS, including that no white-on-orange label can appear in either theme.
-7. **Docker Compose** for PostgreSQL, ClickHouse, MinIO, Temporal (+UI) and Cube, with
-   pinned versions and healthchecks, behind `pnpm dev:infra`, which waits for health.
-8. **CI skeleton** with six jobs. Visual regression is declared and _skipped_, not stubbed
-   green, because no baselines exist before Phase E ([spec-review](spec-review.md) T2).
-9. **README rewritten** for the monorepo — it was still the vinext starter README.
+1. **Tenant isolation in the database, not in the query.** Every org-scoped table is
+   `ENABLE` **and** `FORCE ROW LEVEL SECURITY`, keyed on `app.current_organization_id` set per
+   transaction via `SET LOCAL`. The application role is `NOBYPASSRLS`. Handlers issue
+   `select(Membership)` with no organization predicate; the policy supplies it, so the filter
+   cannot be forgotten because there is no filter to forget.
+2. **Authority is read per request, not carried in the token**
+   ([ADR 0009](adr/0009-authorisation-state-is-not-carried-in-the-token.md)). `VerifiedToken` has
+   two fields, `user_id` and `organization_id`, and no role field for a forged claim to land in.
+   Demotion and revocation take effect on the next request rather than at token expiry.
+3. **The Gap aggregate, with its invariants as CHECK constraints.** No gap without evidence; no
+   modelled money without an ordered low/base/high plus currency, assumptions and confidence;
+   lifecycle consistency; a coherent observation window; one open gap per problem via a partial
+   unique index. Enforced by PostgreSQL, so a data fix or a backfill script cannot bypass them.
+4. **Invitations that treat the code as the credential it is.** Only `sha256(secret)` is stored,
+   and a CHECK constraint refuses a `code_hash` that does not look like a digest. Every redemption
+   failure returns one indistinguishable 404, so the endpoint is not an oracle for guessing codes
+   or for learning who was invited where.
+5. **Better Auth wired, and the JWKS contract proven across both runtimes.**
+   `test_jwks_contract.py` mints a token from a real Better Auth instance against a real migrated
+   database and verifies it with the production `TokenVerifier`.
+6. **Identity secrets are out of the application role's reach.** `accounts` holds password hashes
+   and refresh tokens; `jwks` holds the private signing keys. The new `fitos_auth` role owns them
+   and `fitos_app` is granted nothing on any of them, so an injection in the API cannot reach a
+   signing key.
+7. **One migration history.** Better Auth ships its own migrator; it is not used. Its schema is
+   generated by its CLI and transcribed into Alembic, and a drift test regenerates and compares.
 
 ## changed_files
 
 ```text
-root            package.json · pnpm-workspace.yaml · turbo.json · pyproject.toml
-                .prettierrc.json · .prettierignore · .gitignore · README.md
-                pnpm-lock.yaml · uv.lock
-apps/web        Next.js app, /health route, token-based globals.css
-packages/       config (shared tsconfig) · contracts (health types + tests)
-                ui (token generator + 5 tests)
-services/       api (FastAPI, health + readiness registry, 5 tests)
-                worker (package scaffold, 1 test) · semantic (Cube conf mount)
-infra/          compose/docker-compose.yml · scripts/dev-infra.sh
-.github/        workflows/ci.yml
-legacy/         entire prototype, moved with history; test script fixed
-docs/           screenshots/legacy/ (4 PNGs moved from the repository root)
+services/api    models.py (Organization, User, Membership, AuditEvent, Gap, Invitation)
+                tenancy_sql.py · db.py · capabilities.py · settings.py · audit.py
+                invitations.py · auth/{tokens,deps,principal}.py
+                routes/{auth,invitations,memberships}.py
+                migrations/versions/0001…0004 · tools/check_no_role_comparisons.py
+                tests/ — 10 files, 132 tests
+apps/web        lib/auth.ts · app/api/auth/[...all]/route.ts · scripts/issue-token.ts
+packages/       config/tsconfig.next.json (declarations off for applications)
+docs/           adr/0009 · configuration.md · adr/0005 amended
+.github/        workflows/ci.yml — new `identity` job
 ```
 
 ## commands_run
 
-All at `/home/user/FitOS` on `claude/md-file-review-67empl`. Node 22.22.2, pnpm 10.33.0,
-uv 0.8.17, Python 3.11.15.
+PostgreSQL 16.13 on port 5433, initialised from the server binaries in this container.
 
-| Command                                          | Result                                                                 |
-| ------------------------------------------------ | ---------------------------------------------------------------------- |
-| `pnpm verify`                                    | **exit 0** — format, lint, typecheck, unit, tokens, ruff, mypy, pytest |
-| `pnpm build`                                     | **exit 0** — 2 tasks, web compiled, 3 routes                           |
-| `pnpm test:tokens`                               | **31 pairs, 0 failing**                                                |
-| `pnpm --filter @fitos/ui test:unit`              | 5 pass, 0 fail                                                         |
-| `pnpm --filter @fitos/contracts test:unit`       | 2 pass, 0 fail                                                         |
-| `uv run pytest -q`                               | 6 passed                                                               |
-| `uv run mypy services`                           | Success: no issues found in 6 source files                             |
-| `uv run ruff check services`                     | All checks passed                                                      |
-| legacy: `npm run test:rules`                     | 5 pass, 0 fail                                                         |
-| legacy: `npm test`                               | **3 pass, 0 fail** — was 1/3 before this phase                         |
-| `curl :8000/health`                              | `{"status":"ok","service":"api","version":"0.0.0"}` HTTP 200           |
-| `curl :8000/ready`                               | `{"status":"ready","service":"api","checks":{}}` HTTP 200              |
-| `curl :3000/health`                              | `{"status":"ok","service":"web","version":"0.0.0"}` HTTP 200           |
-| `git log --follow legacy/…/fulfilment-engine.ts` | resolves to `5009b01 Build adaptive fulfilment rules`                  |
-| `bash infra/scripts/dev-infra.sh up`             | exits 1, "the Docker daemon is not running" — clean refusal            |
-| `yaml.safe_load(docker-compose.yml)`             | valid; 7 services, 4 volumes                                           |
-| `yaml.safe_load(ci.yml)`                         | valid; 6 jobs                                                          |
+| Command | Result |
+| --- | --- |
+| `pnpm verify` | **exit 0** — format, lint, typecheck, unit, tokens, ruff, mypy, pytest |
+| `uv run pytest services/api/tests -q` | **132 passed** |
+| `alembic upgrade head` on a fresh database | 0001 → 0002 → 0003 → 0004, clean |
+| `psql -U fitos_app -c "SELECT count(*) FROM jwks"` | `ERROR: permission denied for table jwks` |
+| `pnpm --filter @fitos/web typecheck` | exit 0 |
+| `pnpm run issue-token` → `TokenVerifier.verify_with_key` | `VerifiedToken(user_id=…, organization_id=None)` |
 
 ## test_results
 
-19 automated tests across three suites, all passing: 6 Python (api 5, worker 1),
-7 JavaScript (ui 5, contracts 2), 8 legacy (rules 5, render 3). Plus 31 token contrast
-pairs.
+132 Python tests, all passing against real PostgreSQL.
 
-The tests worth naming, because each encodes a rule rather than exercising a code path:
+| File | Tests | Covers |
+| --- | --- | --- |
+| `test_gap_invariants.py` | 22 | The Gap invariants, each proven refused by the database |
+| `test_invitations.py` | 18 | Code handling, redemption, replay, expiry, cross-tenant |
+| `test_api_tenancy.py` | 16 | 404-not-403, capability refusal, audit, route coverage |
+| `test_guards.py` | 13 | Production guard, role-comparison checker |
+| `test_migrations.py` | 13 | Model/migration drift, RLS, grants, `SECURITY DEFINER` |
+| `test_tenancy.py` | 13 | RLS at the database boundary, append-only audit |
+| `test_tokens.py` | 13 | Algorithm confusion, expiry, audience, issuer, claims |
+| `test_auth_routes.py` | 12 | Session, capabilities, the cross-tenant switcher |
+| `test_jwks_contract.py` | 7 | Node issues → Python verifies, against real key material |
+| `test_health.py` | 5 | Probes, and that a DSN never reaches a response body |
 
-- `test_a_raising_probe_never_leaks_its_message` — a probe raising
-  `ConnectionError("postgres://fitos:hunter2@db.internal:5432/…")` yields
-  `detail: "ConnectionError"`, and the response body contains neither the password nor
-  the host ([threat-model](threat-model.md) T3).
-- `the label on an accent fill is near-black in both themes` — asserts `--on-accent` is
-  `#0B0C0E` in both themes and that `#FFFFFF` never appears as an on-accent value. White
-  on orange measures 3.90:1 and fails AA.
-- `every semantic reference resolved to a literal colour` — catches an unresolvable token
-  reference at build time rather than as a browser rendering a literal string.
+The ones worth naming, because each encodes a rule rather than exercising a code path:
+
+- `test_a_role_claim_in_the_token_is_ignored` — a token asserting `role=owner` and
+  `cap=[member.manage]`, for a user whose membership says `manager`, is refused 403.
+- `test_a_demotion_takes_effect_on_the_next_request` — the same unexpired token succeeds, then is
+  refused. Under a claims-carrying token this cannot pass without waiting out the token lifetime.
+- `test_every_bad_code_gives_the_same_answer` — four different wrong invitation codes produce one
+  identical response, so the endpoint cannot be used to learn which half was right.
+- `test_hs256_signed_with_the_public_key_is_rejected` — the forgery is built by hand with `hmac`
+  and confirmed valid before the assertion, because PyJWT refuses a PEM as an HMAC secret and so
+  cannot be used to demonstrate the attack it is being tested against.
 
 ## decisions_and_adrs
 
-No new ADRs. Phase A implements the decisions recorded in Session 1. Three implementation
-choices worth recording:
+**[ADR 0009 — Authorisation state is read per request, not carried in the token](adr/0009-authorisation-state-is-not-carried-in-the-token.md).**
+Amends ADR 0005, which set the identity/authorisation split but never said what the token carries.
+Two problems with the obvious design: revocation waited for expiry, and the role claim was the
+thing worth forging. Costs one indexed lookup per request, in a session that is being opened
+anyway.
 
-1. **Application services run on the host, not in Compose.** Compose provides
-   infrastructure only, so a code change does not require an image rebuild. Production
-   Dockerfiles arrive in Phase I.
-2. **Prettier does not format `docs/` or `legacy/`.** It pads markdown tables to align
-   columns, which produced a 20-file diff on hand-edited prose the first time it ran, and
-   reformatting the frozen legacy tree defeats the point of freezing it. Code formatting is
-   enforced; prose formatting is not.
-3. **Unimplemented commands exit non-zero** with an "added in Phase X" message rather than
-   succeeding silently. A command that quietly does nothing is how a phase gets marked
-   complete without being complete.
+Three implementation choices worth recording:
+
+1. **The API owns invitations, not Better Auth.** ADR 0005 assigned them to identity. Accepting an
+   invitation creates a membership and a capability grant — authorisation state that needs an audit
+   row and lives behind RLS. Better Auth keeps users, sessions and JWT/JWKS issuance.
+2. **One cross-tenant read, as a `SECURITY DEFINER` function.** "Which organizations do I belong
+   to" cannot be answered inside a tenant scope. Widening the memberships policy would mean every
+   query against that table could also see the caller's other-organization rows, so an unrelated
+   join could leak one by accident. `user_organizations` answers one question, returns only the
+   caller's own rows, and pins `search_path`.
+3. **Declarations off for Next applications.** `declaration: true` is what makes TypeScript try to
+   name every inferred exported type, which fails for a type reaching into a transitive dependency
+   under pnpm's isolated layout. Applications emit no declarations; `packages/` keeps them.
+
+## bugs_found_by_running_it
+
+Four, each of which reads as correct code.
+
+1. **The RLS policy raised instead of denying.** After a rollback,
+   `current_setting('app.current_organization_id', true)` returns an empty string rather than being
+   unset, and `''::uuid` raises 22P02 — so an unscoped query became a 500 rather than an empty
+   result. Still fails closed, but it hides the mistake. Fixed with `nullif(…, '')`.
+2. **`GRANT USAGE` preceded `CREATE ROLE`.** Passes on every cluster where the role already exists
+   — which is every cluster a migration has run against twice, and no cluster on its first deploy.
+   It surfaced the moment migration 0004 added a second role. Now ordered correctly, with a test on
+   the ordering itself.
+3. **The dedupe index existed only in the migration.** The test fixture builds its schema from
+   `Base.metadata`, so the dedupe test was failing against a schema production did not have.
+   Comparing tables and columns alone missed it; index comparison is now part of the drift test.
+4. **Better Auth writes `accounts.issuer`, and its own schema generator omits the column.** Found
+   by a sign-up failing against the generated schema.
+
+## the_guard_that_saw_nothing
+
+Worth its own section, because it is the failure mode most likely to recur.
+
+`test_every_org_scoped_route_is_covered_by_a_cross_tenant_test` was written in Phase B to make
+CLAUDE.md's "every new endpoint gets a cross-tenant negative test in the same commit" enforceable
+rather than aspirational. It walked `app.routes` looking for routes depending on `scoped_session`.
+
+FastAPI keeps each included router as one opaque `_IncludedRouter` entry whose real routes hang off
+`original_router`, so `app.routes` contained the two health endpoints and three opaque objects. The
+guard found zero org-scoped routes and reported full coverage of an empty set. It had never checked
+anything, and it looked identical to one that worked.
+
+It now flattens the tree properly, is cross-checked against the OpenAPI path list so it fails if it
+stops seeing routes, refuses stale entries naming routes that no longer exist, and demands a
+recorded reason for each route that runs without a tenant scope. Its correction was verified by
+removing an entry and watching it fail.
+
+The general lesson: a coverage check that finds nothing passes everything. Every guard added from
+here gets a test that it fails when it should.
 
 ## open_risks
 
-| #   | Risk                                                                    | Status                                                                                                                                                                              |
-| --- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Compose is unverified.** No Docker daemon in this environment          | **Open, blocking for Phase C.** The file is syntax-valid and versions are pinned, but no container has been started. First task of the next session on a Docker-capable machine.     |
-| 2   | **Compose footprint unmeasured** — the Phase A item that feeds risk 3    | **Open.** `pnpm dev:infra footprint` exists to take the measurement; it has never run. Must be taken before the ≈1.42M-record dataset lands in Phase F.                              |
-| 3   | Five infra containers plus ≈1.42M records versus p95 targets on a laptop | Unchanged from Session 1. Cannot be assessed until risk 2 is closed.                                                                                                                |
-| 4   | 16 high-severity advisories in the legacy Cloudflare toolchain           | **Contained.** Outside the workspace with its own lockfile; CI reports them through a non-gating job with a recorded exception rather than hiding them.                              |
-| 5   | Cube × ClickHouse × dbt-clickhouse compatibility                         | Versions now pinned in Compose. Untested until risk 1 is closed.                                                                                                                    |
-| 6   | Better Auth is young for a security-critical position                    | Unchanged. Provider boundary in [ADR 0005](adr/0005-auth-provider.md).                                                                                                              |
-| 7   | CI has never executed                                                    | **Closed.** Run 1 executed on push. 4 jobs passed, visual regression skipped as designed, supply-chain failed and was fixed. See [CI run 1](#ci-run-1).                              |
-
-Risks 1 and 2 share one cause: this environment has no Docker daemon. Neither is a defect
-in the work; both are unverified claims, and they are listed as unverified rather than
-assumed good.
-
-## CI run 1
-
-The workflow's first execution, on `18fe9b6`. It did what a CI skeleton is for: it found
-something.
-
-| Job                                  | Result                                            |
-| ------------------------------------ | ------------------------------------------------- |
-| JS — format, lint, typecheck, unit   | pass                                              |
-| Python — lint, typecheck, unit       | pass                                              |
-| Production build                     | pass                                              |
-| Legacy prototype                     | pass — including the `npm test` fixed this phase  |
-| Dependency audit and secret scan     | **fail**, then fixed                              |
-| Visual regression                    | skipped, as designed                              |
-
-**The audit gate failed on three real high-severity advisories**, all reachable through
-`next@16.2.6` — the version inherited from the prototype:
-
-| Package   | Advisory                                        | Fix                          |
-| --------- | ----------------------------------------------- | ---------------------------- |
-| `next`    | GHSA-p9j2-gv94-2wf4, patched ≥ 16.2.11          | upgraded to 16.2.12          |
-| `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849        | `pnpm.overrides` ≥ 8.5.26    |
-| `sharp`   | GHSA-f88m-g3jw-g9cj (libvips), patched ≥ 0.35.0 | `pnpm.overrides` ≥ 0.35.3    |
-
-Plus two `turbo` advisories (low + moderate, CSRF/session fixation in the login callback),
-fixed by upgrading to 2.9.14.
-
-Fixed by upgrading and pinning, **not** by lowering `--audit-level` or adding an
-exception. `pnpm audit --audit-level high` now reports "No known vulnerabilities found".
-The threshold stays at `high`; a comment in the workflow records why.
-
-Two secondary findings from the same run:
-
-- **The secret scan never ran.** Steps are sequential, so the audit failure aborted the
-  job before gitleaks.
-- `actions/checkout@v4` and `actions/setup-node@v4` emitted Node 20 deprecation warnings;
-  both bumped to v5.
-
-## CI run 2
-
-On `8bede8d`. The audit gate passed with no known vulnerabilities, and **gitleaks executed
-for the first time and found nothing** — the repository has now genuinely been
-secret-scanned, which was not true after run 1.
-
-One job failed, and the cause was the action bump made in the same commit rather than
-anything in the code: `actions/setup-node@v5` enables package-manager caching by default
-and auto-detects the manager from the repository root, which is pnpm. The `legacy` job is
-the only one that uses npm — the legacy tree keeps its own lockfile outside the workspace —
-and it never installs pnpm, so setup-node failed before any step ran and skipped the rest
-of the job. Fixed with `package-manager-cache: false` on that job.
-
-Worth noting because it will recur: a job whose package manager differs from the
-repository default needs that input set explicitly under setup-node v5.
+| # | Risk | Status |
+| --- | --- | --- |
+| 1 | **Compose is unverified.** No Docker daemon in this environment | **Open, blocking for Phase C.** Syntax-valid, versions pinned, no container ever started. |
+| 2 | **Compose footprint unmeasured** | **Open.** `pnpm dev:infra footprint` exists and has never run. Needed before the ≈1.42M-record dataset lands in Phase F. |
+| 3 | Five infra containers plus ≈1.42M records versus p95 targets on a laptop | Unchanged. Cannot be assessed until risk 2 closes. |
+| 4 | 16 high-severity advisories in the legacy Cloudflare toolchain | **Contained.** Outside the workspace with its own lockfile; reported through a non-gating job. |
+| 5 | Cube × ClickHouse × dbt-clickhouse compatibility | Pinned, untested until risk 1 closes. |
+| 6 | Better Auth is young for a security-critical position | **Reduced, not closed.** The boundary is now real: it issues and stores identity, and holds no authorisation state. A compromise still forges identity, but not authority — the membership row decides that. |
+| 7 | CI has never executed | **Closed** in Phase A. Runs 1 and 2 recorded below. |
+| 8 | The `identity` CI job has never run | **Open.** Added this session; the JWKS contract passes locally but the job itself is unexecuted. Same class of risk as 7 was. |
 
 ## next_phase
 
-**Phase B — auth and tenancy.** Acceptance criteria in
-[implementation-plan.md](implementation-plan.md#phase-b--auth-and-tenancy).
+**Phase C — data plane.** Acceptance criteria in
+[implementation-plan.md](implementation-plan.md#phase-c--data-plane).
 
-Close the three open verification items first. They are cheap on a Docker-capable machine
-and they gate Phase C regardless.
+Close risks 1, 2 and 8 first. Phase C needs ClickHouse, MinIO and Temporal genuinely running, so
+the Docker gap stops being a deferred item and becomes the first blocker.
 
 ## next_session_prompt
 
 ```text
 Read @docs/master-build-brief.md, @docs/build-state.md, @docs/implementation-plan.md,
-@CLAUDE.md and @docs/adr/0005-auth-provider.md. Start in Plan Mode.
+@CLAUDE.md, @docs/connector-sdk.md, @docs/data-contracts.md and @docs/adr/0002-analytics-store.md.
+Start in Plan Mode.
 
-First close the three Phase A verification gaps, which need a Docker-capable machine:
-run `pnpm dev:infra` and confirm every container reaches healthy; run
-`pnpm dev:infra footprint` and record container memory and startup time in
-docs/build-state.md; confirm CI is green on the branch. If a container fails to start, fix
-Compose before proceeding — Phase C depends on all of it.
+First close the three verification gaps, which need a Docker-capable machine. Run
+`pnpm dev:infra` and confirm every container reaches healthy. Run `pnpm dev:infra footprint`
+and record container memory and startup time in docs/build-state.md. Confirm CI is green on
+the branch, including the new `identity` job, which has never executed. If a container fails
+to start, fix Compose before writing any Phase C code — the whole phase depends on it.
 
-Then implement Phase B end to end: organizations, memberships, roles and capabilities;
-Better Auth with JWT/JWKS issuance and FastAPI verification against JWKS; PostgreSQL RLS
-on every org-scoped table with the application role unable to bypass it; the append-only
-audit base; the invitation flow; demo identities behind a production guard that fails
-startup if enabled in production.
+Then implement Phase C: raw object storage with immutability; the connector SDK; CSV/XLSX
+upload and generic REST connectors; Temporal workflows for runs, backfills and retries; the
+mapping and cleansing workspace with versioning, preview and rollback; quarantine; canonical
+ClickHouse models; the dbt project and its tests; egress controls; upload validation.
 
-Cross-tenant negative tests are the release gate: for every endpoint, org A's token must
-not read, update or delete org B's records, and must receive 404 rather than 403. Include
-a test that RLS alone blocks the query with the service-layer filter deliberately removed,
-proving defence in depth is real rather than assumed. Add a lint rule that fails on any
-role-name comparison in application code.
+Hold the boundaries in CLAUDE.md: product code never imports a dlt type, connectors never
+construct their own HTTP client, and Temporal workflow bodies stay deterministic with no
+wall-clock time, randomness or I/O.
 
-Run pnpm verify, ask the verification-engineer subagent to challenge the result, fix its
-findings, update docs/build-state.md, commit the coherent outcome and print the exact
-prompt for the next fresh session. Do not start Phase C until Phase B passes its
-acceptance checks.
+The acceptance checks are the gate, and two of them are security tests rather than
+functional ones: SSRF must refuse private, loopback, link-local and redirect-to-private
+targets, and a duplicate signed webhook delivery must yield exactly one canonical fact. Also
+prove idempotency by running the same extract twice for the same row count, prove a
+malformed record is quarantined with its reason while the run still completes, and prove a
+worker restart mid-backfill resumes from checkpoint without duplicating rows.
+
+Every guard you add gets a test that it fails when it should — Phase B shipped a coverage
+guard that silently checked nothing for a whole phase because it walked the wrong list.
+
+Run pnpm verify, update docs/build-state.md, commit the coherent outcome and print the exact
+prompt for the next fresh session. Do not start Phase D until Phase C passes its acceptance
+checks.
 ```
+
+## CI run 1
+
+The workflow's first execution, on `18fe9b6`. It did what a CI skeleton is for: it found something.
+
+| Job | Result |
+| --- | --- |
+| JS — format, lint, typecheck, unit | pass |
+| Python — lint, typecheck, unit | pass |
+| Production build | pass |
+| Legacy prototype | pass — including the `npm test` fixed in Phase A |
+| Dependency audit and secret scan | **fail**, then fixed |
+| Visual regression | skipped, as designed |
+
+**The audit gate failed on three real high-severity advisories**, all reachable through
+`next@16.2.6` — the version inherited from the prototype:
+
+| Package | Advisory | Fix |
+| --- | --- | --- |
+| `next` | GHSA-p9j2-gv94-2wf4, patched ≥ 16.2.11 | upgraded to 16.2.12 |
+| `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | `pnpm.overrides` ≥ 8.5.26 |
+| `sharp` | GHSA-f88m-g3jw-g9cj (libvips), patched ≥ 0.35.0 | `pnpm.overrides` ≥ 0.35.3 |
+
+Plus two `turbo` advisories (low + moderate), fixed by upgrading to 2.9.14.
+
+Fixed by upgrading and pinning, **not** by lowering `--audit-level` or adding an exception. The
+threshold stays at `high`; a comment in the workflow records why.
+
+Two secondary findings: the secret scan never ran, because steps are sequential and the audit
+failure aborted the job before gitleaks; and `actions/checkout@v4` and `setup-node@v4` emitted Node
+20 deprecation warnings, both bumped to v5.
+
+## CI run 2
+
+On `8bede8d`. The audit gate passed and **gitleaks executed for the first time and found nothing** —
+the repository has now genuinely been secret-scanned, which was not true after run 1.
+
+One job failed, caused by the action bump in the same commit rather than by any code:
+`actions/setup-node@v5` enables package-manager caching by default and auto-detects the manager from
+the repository root, which is pnpm. The `legacy` job is the only one using npm and never installs
+pnpm, so setup-node failed before any step ran. Fixed with `package-manager-cache: false`.
+
+Worth noting because it will recur: a job whose package manager differs from the repository default
+needs that input set explicitly under setup-node v5.
 
 ## session history
 
-| Session | Phase                       | Outcome                                                                                                                                                          |
-| ------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1       | Audit and specification     | 37 files: audit, 11 specification documents, 8 ADRs, contradiction review (14 items), Claude Code configuration. Verified regression found in `npm test`.         |
-| 1b      | Palette                     | Near-black + orange, dark default, 31 contrast pairs measured rather than asserted. Both open questions closed by the repository owner.                           |
-| 2       | A — repository and platform | Monorepo, legacy preserved with history, health probes, tokens as code, Compose, CI skeleton. `pnpm verify` exit 0. Three items unverified for lack of a daemon.  |
+| Session | Phase | Outcome |
+| --- | --- | --- |
+| 1 | Audit and specification | 37 files: audit, 11 specification documents, 8 ADRs, contradiction review (14 items), Claude Code configuration. Verified regression found in `npm test`. |
+| 1b | Palette | Near-black + orange, dark default, 31 contrast pairs measured rather than asserted. Both open questions closed by the repository owner. |
+| 2 | A — repository and platform | Monorepo, legacy preserved with history, health probes, tokens as code, Compose, CI skeleton. `pnpm verify` exit 0. Three items unverified for lack of a daemon. |
+| 3 | B — auth and tenancy | RLS proven against real PostgreSQL, ADR 0009, the Gap aggregate, invitations, Better Auth with the JWKS contract tested across runtimes. 132 tests. Four real bugs found by execution, including a coverage guard that had been checking nothing. |
