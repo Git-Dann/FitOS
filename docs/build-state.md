@@ -10,12 +10,14 @@ Phase A — repository and local platform.
 
 ## status
 
-**Complete, with three acceptance items that could not be verified in this environment.**
+**Complete, with two acceptance items that could not be verified in this environment.**
 Everything else was verified by execution. The exceptions are named in
 [open_risks](#open_risks) and repeated here rather than buried: this container has no
-Docker daemon and no CI runner, so Compose was authored and syntax-checked but never
-started, the container footprint measurement has not been taken, and the CI workflow has
-never executed.
+Docker daemon, so Compose was authored and syntax-checked but never started, and the
+container footprint measurement has not been taken.
+
+CI **has** now run — see [CI run 1](#ci-run-1). It found three real high-severity
+advisories in the platform dependency graph on its first execution.
 
 Session 1 (audit and specification) is complete and unchanged — see
 [session history](#session-history).
@@ -130,11 +132,49 @@ choices worth recording:
 | 4   | 16 high-severity advisories in the legacy Cloudflare toolchain           | **Contained.** Outside the workspace with its own lockfile; CI reports them through a non-gating job with a recorded exception rather than hiding them.                              |
 | 5   | Cube × ClickHouse × dbt-clickhouse compatibility                         | Versions now pinned in Compose. Untested until risk 1 is closed.                                                                                                                    |
 | 6   | Better Auth is young for a security-critical position                    | Unchanged. Provider boundary in [ADR 0005](adr/0005-auth-provider.md).                                                                                                              |
-| 7   | **CI has never executed**                                                | **Open.** The workflow is syntax-valid but this repository has no Actions history, so the first push with the workflow present is its first real run.                                |
+| 7   | CI has never executed                                                    | **Closed.** Run 1 executed on push. 4 jobs passed, visual regression skipped as designed, supply-chain failed and was fixed. See [CI run 1](#ci-run-1).                              |
 
-Risks 1, 2 and 7 share one cause: this environment has no Docker daemon and no CI runner.
-None is a defect in the work; all three are unverified claims, and they are listed as
-unverified rather than assumed good.
+Risks 1 and 2 share one cause: this environment has no Docker daemon. Neither is a defect
+in the work; both are unverified claims, and they are listed as unverified rather than
+assumed good.
+
+## CI run 1
+
+The workflow's first execution, on `18fe9b6`. It did what a CI skeleton is for: it found
+something.
+
+| Job                                  | Result                                            |
+| ------------------------------------ | ------------------------------------------------- |
+| JS — format, lint, typecheck, unit   | pass                                              |
+| Python — lint, typecheck, unit       | pass                                              |
+| Production build                     | pass                                              |
+| Legacy prototype                     | pass — including the `npm test` fixed this phase  |
+| Dependency audit and secret scan     | **fail**, then fixed                              |
+| Visual regression                    | skipped, as designed                              |
+
+**The audit gate failed on three real high-severity advisories**, all reachable through
+`next@16.2.6` — the version inherited from the prototype:
+
+| Package   | Advisory                                        | Fix                          |
+| --------- | ----------------------------------------------- | ---------------------------- |
+| `next`    | GHSA-p9j2-gv94-2wf4, patched ≥ 16.2.11          | upgraded to 16.2.12          |
+| `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849        | `pnpm.overrides` ≥ 8.5.26    |
+| `sharp`   | GHSA-f88m-g3jw-g9cj (libvips), patched ≥ 0.35.0 | `pnpm.overrides` ≥ 0.35.3    |
+
+Plus two `turbo` advisories (low + moderate, CSRF/session fixation in the login callback),
+fixed by upgrading to 2.9.14.
+
+Fixed by upgrading and pinning, **not** by lowering `--audit-level` or adding an
+exception. `pnpm audit --audit-level high` now reports "No known vulnerabilities found".
+The threshold stays at `high`; a comment in the workflow records why.
+
+Two secondary findings from the same run:
+
+- **The secret scan never ran.** Steps are sequential, so the audit failure aborted the
+  job before gitleaks. It executes for the first time on the next run — until then, "the
+  repository has been secret-scanned" is not a claim that can be made.
+- `actions/checkout@v4` and `actions/setup-node@v4` emitted Node 20 deprecation warnings;
+  both bumped to v5.
 
 ## next_phase
 

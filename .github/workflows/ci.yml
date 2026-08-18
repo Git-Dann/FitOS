@@ -22,9 +22,9 @@ jobs:
     name: JS — format, lint, typecheck, unit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -41,7 +41,7 @@ jobs:
     name: Python — lint, typecheck, unit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -55,9 +55,9 @@ jobs:
     name: Production build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -71,8 +71,8 @@ jobs:
       run:
         working-directory: legacy/fitos-prototype
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: npm ci
@@ -85,16 +85,20 @@ jobs:
     name: Dependency audit and secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # gitleaks scans history
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Audit platform dependencies (gating)
+        # This gate caught three high-severity advisories on its first run
+        # (next, postcss, sharp). They were fixed by upgrading and by pinning
+        # transitive versions in package.json pnpm.overrides — not by lowering
+        # the threshold. Keep it at high.
         run: pnpm audit --audit-level high
       - name: Audit legacy dependencies (reported, not gating)
         # Recorded, dated exception — docs/spec-review.md T4. The legacy tree
@@ -117,5 +121,5 @@ jobs:
     # (docs/spec-review.md T2). Remove this guard when Phase E adds baselines.
     if: ${{ false }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: pnpm test:visual
