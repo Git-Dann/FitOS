@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [tool.uv.workspace]
-members = ["services/api", "services/worker", "connectors/sdk"]
+members = ["services/api", "services/worker", "connectors/sdk", "connectors/csv_upload", "connectors/rest"]
 
 [tool.uv]
 dev-dependencies = [
@@ -25,7 +25,14 @@ target-version = "py311"
 select = ["E", "F", "I", "N", "UP", "B", "S", "C4", "SIM", "RUF"]
 # assert, subprocess and hard-coded local passwords are all legitimate in
 # tests; every one of them stays enforced in application code.
-per-file-ignores = { "**/tests/**" = ["S101", "S105", "S106", "S603"] }
+#
+# contract_tests.py is the exception that needs stating: it is test code, but it
+# ships as library code under src/ so every connector can inherit the same 14
+# checks rather than copying them. A contract each connector reimplements is not
+# a contract.
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "S603"]
+"**/contract_tests.py" = ["S101"]
 
 [tool.mypy]
 python_version = "3.11"
