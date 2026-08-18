@@ -132,6 +132,13 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --all-packages --frozen
+      - name: Apply the canonical schema
+        # Before dbt, because dbt reads these tables as sources. The first
+        # version of this job let a pytest fixture create them, which works
+        # where the schema already exists and fails on a fresh server.
+        run: uv run python -m canonical.apply
+        env:
+          PYTHONPATH: data
       - name: dbt build (models and their tests)
         run: uv run dbt build --no-use-colors
         working-directory: data/dbt

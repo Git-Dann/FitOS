@@ -2,7 +2,11 @@ version: 2
 
 sources:
   - name: canonical
-    schema: fitos
+    # Configurable rather than hard-coded, so the project can be pointed at a
+    # scratch database. A fixed schema also makes "did the apply step run before
+    # dbt" impossible to test, which is how the ordering bug in CI survived
+    # local verification.
+    schema: "{{ env_var('FITOS_CLICKHOUSE_DB', 'fitos') }}"
     description: >
       The canonical layer, written by connector runs. dbt reads it and never
       writes to it: corrections happen forward through a new mapping version and

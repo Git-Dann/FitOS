@@ -92,10 +92,12 @@ def seeded_and_built() -> Iterator[None]:
     if not _available():
         pytest.fail("FITOS_REQUIRE_CLICKHOUSE is set but ClickHouse is not reachable")
 
-    from canonical.schema import all_statements
+    # The shared applier, not a private copy. Schema creation is a deployment
+    # step that CI performs before dbt runs; the tests call the same function so
+    # a developer running only pytest still gets a correct database.
+    from canonical.apply import apply
 
-    for statement in all_statements():
-        _query(statement, database="default")
+    apply(url=CLICKHOUSE_URL, user=CLICKHOUSE_USER, password=CLICKHOUSE_PASSWORD, database="fitos")
 
     # Three snapshots around one count at 10:00. The 09:30 reading is the only
     # correct comparison: 08:00 is stale, and 11:00 had not happened yet when
