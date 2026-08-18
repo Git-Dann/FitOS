@@ -16,8 +16,24 @@
 import type { DemoGap } from "@/lib/demo-gaps";
 import { ConfidenceMeter, ExposureBase, SeverityChip, StatusChip } from "./chips";
 import { age, count, dateTime, humanise, money, ratio } from "@/lib/format";
+import { TransitionControls, type TransitionRequest } from "./TransitionControls";
+import type { AuditEntry } from "@/lib/ledger-state";
 
-export function PeekPanel({ gap, onClose }: { gap: DemoGap; onClose: () => void }) {
+export function PeekPanel({
+  gap,
+  capabilities,
+  audit,
+  onAssign,
+  onTransition,
+  onClose,
+}: {
+  gap: DemoGap;
+  capabilities: readonly string[];
+  audit: AuditEntry[];
+  onAssign: (owner: string | null) => void;
+  onTransition: (request: TransitionRequest) => void;
+  onClose: () => void;
+}) {
   const basePosition =
     gap.exposureLow !== null && gap.exposureHigh !== null && gap.exposureBase !== null
       ? gap.exposureHigh === gap.exposureLow
@@ -176,6 +192,34 @@ export function PeekPanel({ gap, onClose }: { gap: DemoGap; onClose: () => void 
           ))}
         </div>
       </section>
+
+      <TransitionControls
+        gap={gap}
+        capabilities={capabilities}
+        onAssign={onAssign}
+        onTransition={onTransition}
+      />
+
+      {/* Every transition leaves a record. An audit row that can be absent
+          while the change succeeds is an audit trail that proves nothing —
+          the API writes these in the same transaction as the change. */}
+      {audit.length > 0 ? (
+        <section className="peek-section">
+          <p className="peek-label">Audit · {audit.length}</p>
+          {audit.map((entry, index) => (
+            <div key={index} className="evidence-item">
+              <span className="grow">
+                {entry.action}
+                <div className="mono">
+                  {entry.before} → {entry.after}
+                  {entry.reason ? ` · ${entry.reason}` : ""}
+                </div>
+              </span>
+              <span className="mono">{entry.actor}</span>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       <section className="peek-section">
         <dl className="peek-grid">

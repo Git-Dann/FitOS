@@ -907,3 +907,58 @@ def test_the_request_id_reaches_the_audit_row(
         {"i": str(gaps["gap_a"])},
     ).scalar()
     assert request_id == "req-abc-123"
+
+
+# ---------------------------------------------------------------------------
+# The shared contract
+# ---------------------------------------------------------------------------
+
+
+def test_lifecycle_contract_matches_the_module() -> None:
+    """The committed JSON is what the web app reads. If it drifts from the
+    module, the UI offers transitions the API refuses — or hides ones it allows.
+
+    This is the same shape as the design tokens: one source, a generated
+    artefact, and a test that fails when the artefact goes stale. Without the
+    test the artefact is just a second copy with better branding.
+    """
+    import json
+    import sys
+    from pathlib import Path
+
+    tools = Path(__file__).resolve().parents[1] / "tools"
+    sys.path.insert(0, str(tools))
+    from export_gap_lifecycle import CONTRACT_PATH, build
+
+    assert CONTRACT_PATH.exists(), (
+        "packages/contracts/src/gap-lifecycle.json is missing. Regenerate with "
+        "`uv run python services/api/tools/export_gap_lifecycle.py`."
+    )
+    committed = json.loads(CONTRACT_PATH.read_text())
+    assert committed == build(), (
+        "The lifecycle contract has drifted from lifecycle.py. Regenerate with "
+        "`uv run python services/api/tools/export_gap_lifecycle.py` and review the diff."
+    )
+
+
+def test_the_contract_is_not_trivially_empty() -> None:
+    """A drift test over an empty artefact passes on anything.
+
+    Both halves of the comparison come from the same function, so an export that
+    silently produced `{}` would still match a committed `{}`. This asserts the
+    contract actually carries the table.
+    """
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+    from export_gap_lifecycle import build
+
+    contract = build()
+    assert len(contract["statuses"]) == 7
+    assert len(contract["dismissalReasons"]) >= 5
+    # Ten legal edges, as test_the_table_enumerates_exactly_the_documented_edges
+    # asserts against the module itself.
+    assert sum(len(targets) for targets in contract["transitions"].values()) == 10
+    assert contract["transitions"]["resolved"] == []
+    assert contract["transitionCapability"]["dismissed"] == "gap.dismiss"

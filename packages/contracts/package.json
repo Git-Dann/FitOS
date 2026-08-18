@@ -14,5 +14,9 @@
     "@fitos/config": "workspace:*",
     "typescript": "5.9.3",
     "@types/node": "22.19.19"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./lifecycle": "./src/lifecycle.ts"
   }
 }

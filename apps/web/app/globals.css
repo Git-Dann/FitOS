@@ -601,3 +601,66 @@ kbd {
 .gap-title {
   min-width: 0;
 }
+
+/* --- action controls ------------------------------------------------------ */
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.action-label {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  min-width: 44px;
+}
+
+.control {
+  font: inherit;
+  font-size: var(--text-xs);
+  min-height: 26px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-raised);
+  color: var(--fg-default);
+  cursor: pointer;
+}
+
+.control:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.control:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.control-action {
+  text-transform: capitalize;
+}
+
+textarea.control {
+  width: 100%;
+  resize: vertical;
+  cursor: text;
+}
+
+.dismiss-form {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  margin-top: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-canvas);
+}
+
+.action-note {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  margin: 0;
+}

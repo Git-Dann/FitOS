@@ -16,26 +16,44 @@
  * appears only when the list gets long enough to matter.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { GapStatus } from "@fitos/contracts/lifecycle";
 import type { DemoGap, Severity } from "@/lib/demo-gaps";
 import { groupBySeverity } from "@/lib/demo-gaps";
 import { ConfidenceMeter, ExposureCell, SeverityChip, StatusChip } from "./chips";
 import { PeekPanel } from "./PeekPanel";
 import { age, shortDate } from "@/lib/format";
+import { assign, transition, type LedgerState } from "@/lib/ledger-state";
+import type { TransitionRequest } from "./TransitionControls";
 
 interface IndexedGroup {
   severity: Severity;
   rows: { gap: DemoGap; index: number }[];
 }
 
-export function GapLedger({ gaps }: { gaps: DemoGap[] }) {
+export function GapLedger({
+  gaps,
+  capabilities,
+}: {
+  gaps: DemoGap[];
+  capabilities: readonly string[];
+}) {
+  const [state, setState] = useState<LedgerState>({ gaps, audit: {} });
+
+  // Terminal gaps leave the inbox, which is what makes dismissal feel like the
+  // consequential act it is. They are not deleted — the gaps route shows them.
+  const open = useMemo(
+    () => state.gaps.filter((gap) => gap.status !== "resolved" && gap.status !== "dismissed"),
+    [state.gaps],
+  );
+
   const { groups, total } = useMemo(() => {
     let cursor = 0;
-    const indexed: IndexedGroup[] = groupBySeverity(gaps).map((group) => ({
+    const indexed: IndexedGroup[] = groupBySeverity(open).map((group) => ({
       severity: group.severity,
       rows: group.gaps.map((gap) => ({ gap, index: cursor++ })),
     }));
     return { groups: indexed, total: cursor };
-  }, [gaps]);
+  }, [open]);
 
   const flat = useMemo(() => groups.flatMap((group) => group.rows.map((row) => row.gap)), [groups]);
 
@@ -90,7 +108,8 @@ export function GapLedger({ gaps }: { gaps: DemoGap[] }) {
     );
   }
 
-  const active = flat[activeIndex];
+  // A dismissal shortens the list, so the cursor can point past the end.
+  const active = flat[Math.min(activeIndex, flat.length - 1)];
 
   return (
     <>
@@ -151,11 +170,25 @@ export function GapLedger({ gaps }: { gaps: DemoGap[] }) {
           </section>
         ))}
         <p className="keyboard-hint">
-          <kbd>J</kbd> <kbd>K</kbd> move · <kbd>Space</kbd> peek · <kbd>Esc</kbd> close. Assign,
-          status, bulk select and the command menu arrive with the rest of Phase E.
+          <kbd>J</kbd> <kbd>K</kbd> move · <kbd>Space</kbd> peek · <kbd>Esc</kbd> close. Assign and
+          status live in the peek. Bulk select, the command menu and the detail route arrive with
+          the rest of Phase E.
         </p>
       </div>
-      {peekOpen && active ? <PeekPanel gap={active} onClose={() => setPeekOpen(false)} /> : null}
+      {peekOpen && active ? (
+        <PeekPanel
+          gap={active}
+          capabilities={capabilities}
+          audit={state.audit[active.id] ?? []}
+          onAssign={(owner) => setState((current) => assign(current, active.id, owner))}
+          onTransition={(request: TransitionRequest) =>
+            setState((current) =>
+              transition(current, active.id, request as { to: GapStatus }, capabilities),
+            )
+          }
+          onClose={() => setPeekOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
