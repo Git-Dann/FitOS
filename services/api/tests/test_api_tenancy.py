@@ -462,6 +462,11 @@ def test_every_route_that_touches_tenant_data_is_covered_by_a_cross_tenant_test(
         # test_ingest.py: 404 on another tenant's connection, and the stored
         # key derives from the token's organization rather than the form's.
         "/v1/ingest/uploads",
+        # test_runs.py: list scoping, 404 on read, 404 on another tenant's
+        # connection for both the run and the backfill verbs.
+        "/v1/runs",
+        "/v1/runs/{run_id}",
+        "/v1/runs/backfill",
     }
     # Routes that deliberately run without a tenant scope, and where the
     # cross-tenant reasoning lives.

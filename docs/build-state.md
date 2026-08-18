@@ -6,167 +6,174 @@ Updated at the end of every session. Read this before starting a phase.
 
 ## current_phase
 
-Phase B — auth and tenancy.
+Phase C — data plane.
 
 ## status
 
-**Acceptance checks pass. The two long-standing Phase A verification gaps are now closed.**
+**Acceptance checks pass. All seven Phase C criteria are met and each is proven by execution.**
 
-All five Phase B acceptance criteria are met and each is backed by a test that has been run
-against real PostgreSQL rather than a mock — RLS cannot be exercised against a mock, and an
-untested RLS policy is worth nothing. 132 Python tests pass; `pnpm verify` exits 0.
+422 Python tests pass across the API, worker, connectors and canonical layers, plus 19 dbt models
+and tests. `pnpm verify` exits 0 and now includes `test:data`, which used to be a placeholder that
+exited 0 without running anything.
 
-Risks 1 and 2 had been open since Phase A because this container reported no Docker daemon. It
-turned out `dockerd` was installed and simply not running. Started by hand, the stack came up and
-**found three real bugs that no amount of reading the file would have shown** — see
-[what starting Compose found](#what-starting-compose-found). All seven services now reach healthy
-in 18 seconds and the footprint is measured.
+Every criterion is checked against a real dependency rather than a mock: PostgreSQL for tenancy,
+ClickHouse for the canonical contract and the governed models, Temporal for the workflows, and a
+real Better Auth instance for the JWKS contract carried over from Phase B. Four new CI jobs carry
+those services with `FITOS_REQUIRE_*` flags, so a missing dependency fails rather than reads as a
+passing check.
 
-Tenancy work earlier in the phase used a PostgreSQL 16.13 cluster initialised directly from the
-server binaries at `/usr/lib/postgresql/16/bin` on port 5433, which is what made every claim below
-provable before Docker was available. The migrations have since been applied to the Compose
-PostgreSQL as well, so the schema is proven on both.
+Phases A and B remain complete; their records are below.
 
 ## acceptance
 
 | # | Criterion | Evidence |
 | --- | --- | --- |
-| 1 | Cross-tenant negative tests for every implemented endpoint; 404 not 403 | `test_api_tenancy.py` (16), `test_invitations.py` (18). The coverage guard that enforces "a negative test in the same commit" was itself broken — see [the guard that saw nothing](#the-guard-that-saw-nothing). |
-| 2 | RLS blocks the query with the service-layer filter deliberately removed | `test_rls_alone_blocks_the_query`. Every list endpoint ships with no organization predicate at all, so this is not a contrived case — it is how the handlers are written. |
-| 3 | Capability checks everywhere; a lint rule fails on any role-name comparison | `tools/check_no_role_comparisons.py`, an AST checker, wired into `pnpm lint:py`. `test_guards.py` proves it flags equality and prefix matches, ignores prose, and passes on the real tree. |
-| 4 | Audit rows for every state transition; UPDATE and DELETE fail as the application role | `TestAuditIsAppendOnly`. Append-only by grant absence, not by trigger: the role holds `SELECT, INSERT` and nothing else. |
-| 5 | Startup fails if demo auth is enabled in production | `test_the_process_refuses_to_start_not_just_the_model_to_construct` runs a real interpreter and asserts the import fails, because a model that raises is not the same as a process that will not start. |
+| 1 | The 14-point connector contract suite passes for both connectors | `contract_tests.py`, inherited by both. 43 CSV + 54 REST tests |
+| 2 | Idempotency: the same extract twice yields the same canonical row count | Proven three times — identical record *ids* per connector, identical staging rows per run, and a re-ingested row collapsing to one under `FINAL` in ClickHouse |
+| 3 | Duplicate webhook: the same signed delivery twice yields one canonical fact | `test_the_same_delivery_twice_is_accepted_once`, over HTTP, with the row count asserted |
+| 4 | SSRF: private, loopback, link-local and redirect-to-private all refused | 38 egress tests plus connector-level refusals. Release gate |
+| 5 | A mapping version can be created, previewed, backfilled, compared and rolled back through the API | `test_mappings.py` (25) and `test_runs.py` (14) |
+| 6 | A malformed record is quarantined with its reason and mapping version, the run completes, counts are never silent | `test_runner.py`, including `read == written + quarantined` for every fixture |
+| 7 | dbt tests pass; canonical contract tests pass | 19 dbt, 53 canonical, 6 governed-model — all against live ClickHouse |
+| 8 | Worker restart mid-backfill resumes from checkpoint without duplicating rows | `test_a_restart_resumes_from_the_checkpoint_without_duplicating` |
+| 9 | Threat-model review for the ingestion boundary recorded | [threat-model-review-phase-c.md](threat-model-review-phase-c.md) — and it found two gaps |
 
 ## completed_outcomes
 
-1. **Tenant isolation in the database, not in the query.** Every org-scoped table is
-   `ENABLE` **and** `FORCE ROW LEVEL SECURITY`, keyed on `app.current_organization_id` set per
-   transaction via `SET LOCAL`. The application role is `NOBYPASSRLS`. Handlers issue
-   `select(Membership)` with no organization predicate; the policy supplies it, so the filter
-   cannot be forgotten because there is no filter to forget.
-2. **Authority is read per request, not carried in the token**
-   ([ADR 0009](adr/0009-authorisation-state-is-not-carried-in-the-token.md)). `VerifiedToken` has
-   two fields, `user_id` and `organization_id`, and no role field for a forged claim to land in.
-   Demotion and revocation take effect on the next request rather than at token expiry.
-3. **The Gap aggregate, with its invariants as CHECK constraints.** No gap without evidence; no
-   modelled money without an ordered low/base/high plus currency, assumptions and confidence;
-   lifecycle consistency; a coherent observation window; one open gap per problem via a partial
-   unique index. Enforced by PostgreSQL, so a data fix or a backfill script cannot bypass them.
-4. **Invitations that treat the code as the credential it is.** Only `sha256(secret)` is stored,
-   and a CHECK constraint refuses a `code_hash` that does not look like a digest. Every redemption
-   failure returns one indistinguishable 404, so the endpoint is not an oracle for guessing codes
-   or for learning who was invited where.
-5. **Better Auth wired, and the JWKS contract proven across both runtimes.**
-   `test_jwks_contract.py` mints a token from a real Better Auth instance against a real migrated
-   database and verifies it with the production `TokenVerifier`.
-6. **Identity secrets are out of the application role's reach.** `accounts` holds password hashes
-   and refresh tokens; `jwks` holds the private signing keys. The new `fitos_auth` role owns them
-   and `fitos_app` is granted nothing on any of them, so an injection in the API cannot reach a
-   signing key.
-7. **One migration history.** Better Auth ships its own migrator; it is not used. Its schema is
-   generated by its CLI and transcribed into Alembic, and a drift test regenerates and compares.
+1. **The egress boundary, built before anything that depends on it.** A connector cannot construct
+   an HTTP client; it gets one with the policy fastened to it, and the contract suite reads each
+   connector's source to prove there is no second client. Connections go to an address that was
+   actually checked, which closes the DNS rebind.
+2. **A contract, not a template.** The 14 points ship as library code that a connector inherits by
+   subclassing. A contract each connector reimplements is not a contract. Several checks exist to
+   stop their partner passing vacuously — the "rejects bad config" test has a "accepts good config"
+   twin, and so does quarantine.
+3. **Idempotency from content, not bookkeeping.** Record ids derive from the source's own id or from
+   a digest; raw keys are the content digest; the canonical layer is `ReplacingMergeTree` on the
+   natural key. Every link in that chain has a test, because the chain fails silently if any one of
+   them breaks.
+4. **Mapping versions that make corrections a forward operation.** An applied version is frozen
+   except for `is_active`; rolling back re-applies an earlier version rather than deleting a later
+   one; a backfill re-reads history through the currently active mapping. Nothing edits a canonical
+   row in place.
+5. **Nothing is dropped silently.** Quarantine carries a closed enumeration of reasons, the raw
+   reference and the mapping version. The run summary always states the rejected count, including
+   when it is zero.
+6. **Deterministic workflows, enforced statically.** An AST check fails on wall-clock time,
+   randomness, I/O or a retry loop in a workflow body, and it was verified by introducing a
+   violation and watching it fail.
+7. **A governed layer whose correctness is tested, not assumed.** The Stock Truth model is checked
+   against three snapshots around one count, where the plausible mistake — nearest snapshot in
+   absolute time — would raise a gap against somebody who counted correctly.
+8. **An ingestion boundary that treats its input as hostile.** Sniffed contents, caps applied while
+   reading, filenames never used to build paths, and one indistinguishable refusal for every
+   webhook failure.
 
 ## changed_files
 
 ```text
-services/api    models.py (Organization, User, Membership, AuditEvent, Gap, Invitation)
-                tenancy_sql.py · db.py · capabilities.py · settings.py · audit.py
-                invitations.py · auth/{tokens,deps,principal}.py
-                routes/{auth,invitations,memberships}.py
-                migrations/versions/0001…0004 · tools/check_no_role_comparisons.py
-                tests/ — 10 files, 132 tests
-apps/web        lib/auth.ts · app/api/auth/[...all]/route.ts · scripts/issue-token.ts
-packages/       config/tsconfig.next.json (declarations off for applications)
-docs/           adr/0009 · configuration.md · adr/0005 amended
-.github/        workflows/ci.yml — new `identity` job
+connectors/      sdk/ — egress, http, types, context, raw_store, quarantine, webhooks,
+                 mapping, contract_tests (the 14 points as library code)
+                 csv_upload/ · rest/ — the two Tier 1 connectors
+services/api     models.py (+Connection, MappingVersion, ConnectorRun, QuarantinedRecord,
+                 WebhookDelivery) · migrations 0005 · routes/{mappings,ingest,runs}.py
+services/worker  runner.py (the run executor) · workflows.py (Temporal)
+data/            canonical/ — schema.py, apply.py and the contract tests
+                 dbt/ — three governed models, 16 dbt tests
+docs/            threat-model-review-phase-c.md · threat-model.md cross-reference
+.github/         workflows/ci.yml — canonical and workflows jobs
 ```
 
 ## commands_run
 
-PostgreSQL 16.13 on port 5433, initialised from the server binaries in this container.
+PostgreSQL 16.13 on 5433, plus the full Compose stack for ClickHouse, Temporal, MinIO and Cube.
 
 | Command | Result |
 | --- | --- |
-| `pnpm verify` | **exit 0** — format, lint, typecheck, unit, tokens, ruff, mypy, pytest |
-| `uv run pytest services/api/tests -q` | **132 passed** |
-| `alembic upgrade head` on a fresh database | 0001 → 0002 → 0003 → 0004, clean |
-| `psql -U fitos_app -c "SELECT count(*) FROM jwks"` | `ERROR: permission denied for table jwks` |
-| `pnpm --filter @fitos/web typecheck` | exit 0 |
-| `pnpm build` with no secrets in the environment | exit 0 — the build must not need the signing secret |
-| `pnpm dev:infra` | **7/7 healthy in 18s** |
-| `alembic upgrade head` against the Compose postgres | 0001 → 0004, clean |
-| `SELECT version()` on ClickHouse over HTTP | `24.8.14.39`; `SHOW DATABASES` includes `fitos` |
-| MinIO `/minio/health/live` · Cube `/readyz` · Temporal UI `/` | 200 · 200 · 200 |
-| `pnpm run issue-token` → `TokenVerifier.verify_with_key` | `VerifiedToken(user_id=…, organization_id=None)` |
+| `pnpm verify` | **exit 0** — now includes `test:data` |
+| `uv run pytest` | **422 passed, 6 skipped** |
+| `pnpm canonical:apply` | applied 12 canonical tables |
+| `dbt build` | **PASS=19** — 3 models, 16 tests |
+| `dbt build` against an empty database | **ERROR=3** — reproduces the CI failure the apply step fixes |
+| `dbt test` with a seeded negative amount | **FAIL 1** — "Got 1 result, configured to fail if != 0" |
+| Determinism check with `uuid.uuid4()` in a workflow body | fails, naming the call and the fix |
+| `pnpm dev:infra` | 7/7 healthy in 18s |
 
 ## test_results
 
-132 Python tests, all passing against real PostgreSQL.
+422 Python tests plus 19 dbt models and tests. The largest suites:
 
 | File | Tests | Covers |
 | --- | --- | --- |
-| `test_gap_invariants.py` | 22 | The Gap invariants, each proven refused by the database |
-| `test_invitations.py` | 18 | Code handling, redemption, replay, expiry, cross-tenant |
-| `test_api_tenancy.py` | 16 | 404-not-403, capability refusal, audit, route coverage |
-| `test_guards.py` | 13 | Production guard, role-comparison checker |
-| `test_migrations.py` | 13 | Model/migration drift, RLS, grants, `SECURITY DEFINER` |
-| `test_tenancy.py` | 13 | RLS at the database boundary, append-only audit |
-| `test_tokens.py` | 13 | Algorithm confusion, expiry, audience, issuer, claims |
-| `test_auth_routes.py` | 12 | Session, capabilities, the cross-tenant switcher |
-| `test_jwks_contract.py` | 7 | Node issues → Python verifies, against real key material |
-| `test_health.py` | 5 | Probes, and that a DSN never reaches a response body |
+| `test_rest_connector.py` | 54 | The 14 points, egress, webhooks, pagination, secrets |
+| `test_canonical_schema.py` | 53 | ClickHouse physical rules, checked against the server |
+| `test_csv_connector.py` | 43 | The 14 points, plus what spreadsheets actually send |
+| `test_egress.py` | 38 | One test per SSRF bypass |
+| `test_ingest.py` | 26 | Uploads and signed webhooks over HTTP |
+| `test_mappings.py` | 25 | Create, preview, apply, compare, roll back |
+| `test_workflows.py` | 17 | Determinism statically, behaviour against real Temporal |
+| `test_runner.py` | 17 | Idempotency, quarantine, partial results, resumption |
+| `test_runs.py` | 14 | Runs and backfills through the API |
+| `test_governed_models.py` | 6 | The governed models against seeded data |
 
-The ones worth naming, because each encodes a rule rather than exercising a code path:
+The ones worth naming:
 
-- `test_a_role_claim_in_the_token_is_ignored` — a token asserting `role=owner` and
-  `cap=[member.manage]`, for a user whose membership says `manager`, is refused 403.
-- `test_a_demotion_takes_effect_on_the_next_request` — the same unexpired token succeeds, then is
-  refused. Under a claims-carrying token this cannot pass without waiting out the token lifetime.
-- `test_every_bad_code_gives_the_same_answer` — four different wrong invitation codes produce one
-  identical response, so the endpoint cannot be used to learn which half was right.
-- `test_hs256_signed_with_the_public_key_is_rejected` — the forgery is built by hand with `hmac`
-  and confirmed valid before the assertion, because PyJWT refuses a PEM as an HMAC secret and so
-  cannot be used to demonstrate the attack it is being tested against.
+- `test_the_stock_check_compares_against_the_snapshot_before_it` — three snapshots around one count,
+  where the plausible mistake reports a discrepancy of −28 against somebody who counted correctly.
+- `test_the_checkpoint_is_saved_after_the_batch_not_before` — watches the call order, because the
+  other order loses records and nothing reports it.
+- `test_the_client_exposes_no_unchecked_way_to_make_a_request` — asserts the egress client's public
+  surface is exactly six names, so inheritance cannot quietly add a seventh.
+- `test_a_transport_error_does_not_leak_the_api_key` — the leak that actually happens, which is
+  never `log(api_key)`.
+- `test_read_always_equals_written_plus_quarantined` — a record that is read and neither written nor
+  quarantined has vanished, and no count would ever show it.
 
 ## decisions_and_adrs
 
-**[ADR 0009 — Authorisation state is read per request, not carried in the token](adr/0009-authorisation-state-is-not-carried-in-the-token.md).**
-Amends ADR 0005, which set the identity/authorisation split but never said what the token carries.
-Two problems with the obvious design: revocation waited for expiry, and the role claim was the
-thing worth forging. Costs one indexed lookup per request, in a session that is being opened
-anyway.
+No new ADRs. Phase C implements the decisions in ADRs 0002 (ClickHouse), 0003 (Temporal), 0004
+(Cube) and 0006 (raw storage). Five implementation choices worth recording:
 
-Three implementation choices worth recording:
-
-1. **The API owns invitations, not Better Auth.** ADR 0005 assigned them to identity. Accepting an
-   invitation creates a membership and a capability grant — authorisation state that needs an audit
-   row and lives behind RLS. Better Auth keeps users, sessions and JWT/JWKS issuance.
-2. **One cross-tenant read, as a `SECURITY DEFINER` function.** "Which organizations do I belong
-   to" cannot be answered inside a tenant scope. Widening the memberships policy would mean every
-   query against that table could also see the caller's other-organization rows, so an unrelated
-   join could leak one by accident. `user_organizations` answers one question, returns only the
-   caller's own rows, and pins `search_path`.
-3. **Declarations off for Next applications.** `declaration: true` is what makes TypeScript try to
-   name every inferred exported type, which fails for a type reaching into a transitive dependency
-   under pnpm's isolated layout. Applications emit no declarations; `packages/` keeps them.
+1. **The 14-point contract ships as library code.** A contract each connector reimplements is not a
+   contract. It is capability-aware without being lenient: a connector declaring no webhook support
+   skips those tests but is still checked for *refusing* one, because an endpoint that accepts
+   unverified payloads is worse than no endpoint.
+2. **Transforms are a closed set of eight, not an expression language.** An expression language
+   configured by whoever can edit a connection is remote code execution, and "it is only a formula"
+   is how that ships.
+3. **The mapping interpreter lives in the SDK, not in either service.** Both need it and neither
+   owns it: the API previews and compares, the worker applies. A preview computed by different code
+   from the run it predicts lies at the worst possible moment.
+4. **A backfill fans out one child workflow per window.** A failure costs one window, the plan stays
+   deterministic so a resumed backfill knows what is done, and a year-long range does not accumulate
+   one enormous history.
+5. **Canonical schema creation is a deployment step, not a test fixture.** Discovered the hard way —
+   see below.
 
 ## bugs_found_by_running_it
 
-Four, each of which reads as correct code.
+Phase B found four. Phase C found seven more, and every one of them reads as correct code.
 
-1. **The RLS policy raised instead of denying.** After a rollback,
-   `current_setting('app.current_organization_id', true)` returns an empty string rather than being
-   unset, and `''::uuid` raises 22P02 — so an unscoped query became a 500 rather than an empty
-   result. Still fails closed, but it hides the mistake. Fixed with `nullif(…, '')`.
-2. **`GRANT USAGE` preceded `CREATE ROLE`.** Passes on every cluster where the role already exists
-   — which is every cluster a migration has run against twice, and no cluster on its first deploy.
-   It surfaced the moment migration 0004 added a second role. Now ordered correctly, with a test on
-   the ordering itself.
-3. **The dedupe index existed only in the migration.** The test fixture builds its schema from
-   `Base.metadata`, so the dedupe test was failing against a schema production did not have.
-   Comparing tables and columns alone missed it; index comparison is now part of the drift test.
-4. **Better Auth writes `accounts.issuer`, and its own schema generator omits the column.** Found
-   by a sign-up failing against the generated schema.
+1. **`join_use_nulls` in the Stock Truth model.** ClickHouse fills an unmatched LEFT JOIN row with
+   type *defaults*, not NULL, so a variant the inventory feed has never covered came back as "the
+   system believed 0 units, at 1970-01-01" — a plausible-looking row reporting a phantom surplus
+   equal to whatever was counted. And the setting has to be written into the query: a dbt model
+   config applies when the view is *created*, and a view runs its query later.
+2. **The canonical schema was created by a pytest fixture.** So the tables existed as a side effect
+   of running tests. Fine locally, fatal on a fresh CI server the moment `dbt build` ran first —
+   which it did. Now an explicit applier that CI runs before dbt and the tests call directly.
+3. **`sources.yml` hard-coded the schema**, so my first attempt to *verify* the fix silently read
+   the already-populated database and proved nothing.
+4. **The backfill loop unpacked each window's end bound and never used it.** Every child would have
+   re-read the same range, making the fan-out pointless. Found by a linter, not by me.
+5. **The webhook endpoint had no tenant scope.** An unauthenticated request has no principal to
+   derive one from, so the connection lookup ran unscoped and RLS correctly returned nothing. The
+   policy caught a design error before it could become a cross-tenant read.
+6. **My first tenant-hard-coding check fired on correct code** — it matched the string
+   `organization_id =`, which flagged a CTE joining on the tenant column. A test that fires on
+   correct code teaches everyone to ignore it.
+7. **Cube's RocksDB state had been committed** by an over-broad `git add` the first time Compose
+   started: 344 KB of a container's working data in the repository.
 
 ## the_guard_that_saw_nothing
 
@@ -193,14 +200,23 @@ here gets a test that it fails when it should.
 
 | # | Risk | Status |
 | --- | --- | --- |
-| 1 | **Compose is unverified** | **Closed.** All seven services healthy in 18s, after fixing the three bugs starting it exposed. |
-| 2 | **Compose footprint unmeasured** | **Closed.** 589 MiB across seven containers at idle; 3.38 GB of images. See [footprint](#footprint). |
-| 3 | Seven containers plus ≈1.42M records versus p95 targets on a laptop | **Reduced.** Idle cost is modest — 589 MiB, well inside a 16 GB laptop. Unknown under load: this is an idle measurement, and the dataset does not exist yet. Re-measure in Phase F with data present. |
-| 4 | 16 high-severity advisories in the legacy Cloudflare toolchain | **Contained.** Outside the workspace with its own lockfile; reported through a non-gating job. |
-| 5 | Cube × ClickHouse × dbt-clickhouse compatibility | Pinned, untested until risk 1 closes. |
-| 6 | Better Auth is young for a security-critical position | **Reduced, not closed.** The boundary is now real: it issues and stores identity, and holds no authorisation state. A compromise still forges identity, but not authority — the membership row decides that. |
-| 7 | CI has never executed | **Closed** in Phase A. Runs 1 and 2 recorded below. |
-| 8 | The `identity` CI job has never run | **Closed.** Executed on `0c3eb9d` and passed in 51s. See [CI run 3](#ci-run-3). |
+| 1 | Compose is unverified | **Closed** in Phase C's session. 7/7 healthy in 18s. |
+| 2 | Compose footprint unmeasured | **Closed.** 589 MiB idle across seven containers. |
+| 3 | Seven containers plus ≈1.42M records versus p95 targets on a laptop | **Open, reduced.** Idle cost is modest; the dataset still does not exist. Re-measure in Phase F with data present. |
+| 4 | 16 high-severity advisories in the legacy Cloudflare toolchain | **Contained.** Outside the workspace with its own lockfile. |
+| 5 | Cube × ClickHouse × dbt-clickhouse compatibility | **Partially closed.** dbt-clickhouse builds against ClickHouse 24.8 and Cube reaches it. Cube's own models arrive in Phase D. |
+| 6 | Better Auth is young for a security-critical position | **Reduced.** It holds no authorisation state; a compromise forges identity, not authority. |
+| 7 | CI has never executed | **Closed** in Phase A. |
+| 8 | The `identity` CI job has never run | **Closed.** Passed on `0c3eb9d`. |
+| C1 | **Upload hardening the threat model already claims is absent** — decompression ratio cap, XXE, malware scanning, attachment-only serving | **Open, blocking.** Not exploitable today because no XLSX parser or download endpoint exists. Must land *before* either does. |
+| C2 | The no-pickle / safe-YAML lint rule the threat model promises does not exist | **Open.** The property holds today only because nobody has written the bad line — exactly what "no guard without a test that it fails" is about. |
+| C3 | `threat-model.md` T7 says "https only"; the code allows http for allowlisted private hosts | **Open, documentation.** Correct the document, not the code. |
+| C4 | Secrets live in configuration, not a secret manager with rotation | **Open.** Phase I. |
+| C5 | Cube idles at 18.9% CPU, more than ClickHouse | **Open.** A dev-mode container; Phase D configures it properly. |
+
+C1 to C4 come from [the Phase C threat-model review](threat-model-review-phase-c.md), which found
+two places where the threat model claims a control that is not implemented. They are recorded rather
+than quietly deferred.
 
 ## footprint
 
@@ -251,44 +267,49 @@ intended value is visible rather than silent.
 
 ## next_phase
 
-**Phase C — data plane.** Acceptance criteria in
-[implementation-plan.md](implementation-plan.md#phase-c--data-plane).
+**Phase D — semantic and gap engine.** *The vertical slice completes here.* Acceptance criteria in
+[implementation-plan.md](implementation-plan.md#phase-d--semantic-and-gap-engine).
 
-No blockers. ClickHouse, MinIO, Temporal and Cube are running and answering, and CI is green on the
-branch including the new `identity` job. Phase C can start on code rather than on environment.
+The data plane is in place and proven, so Phase D can start on metric definitions rather than on
+plumbing. `gov_stock_truth` already computes the Stock Truth Gap's input correctly, which is the
+detector's first dependency.
 
 ## next_session_prompt
 
 ```text
 Read @docs/master-build-brief.md, @docs/build-state.md, @docs/implementation-plan.md,
-@CLAUDE.md, @docs/connector-sdk.md, @docs/data-contracts.md and @docs/adr/0002-analytics-store.md.
+@CLAUDE.md, @docs/data-contracts.md, @docs/gap-model.md and @docs/adr/0004-semantic-layer.md.
 Start in Plan Mode.
 
-Start by running `pnpm dev:infra` and confirming 7/7 healthy — if `dockerd` is not running,
-start it; it is installed and simply not started by default in some environments.
+Bring the stack up first: `pnpm dev:infra` (start dockerd if it is not running — it is installed),
+then `pnpm canonical:apply` and `pnpm dbt:build`. Confirm CI is green on the branch.
 
-Then implement Phase C: raw object storage with immutability; the connector SDK; CSV/XLSX
-upload and generic REST connectors; Temporal workflows for runs, backfills and retries; the
-mapping and cleansing workspace with versioning, preview and rollback; quarantine; canonical
-ClickHouse models; the dbt project and its tests; egress controls; upload validation.
+Then implement Phase D: governed metric definitions as code; Cube models and tenant policies; the
+detector framework with versioned config, typed I/O, replay and fixtures; the twelve detector
+classes starting with source mismatch and ratio threshold; exposure and confidence models; gap
+lifecycle with permissioned transitions; evidence lineage; dedupe and correlation; actions and
+outcomes.
 
-Hold the boundaries in CLAUDE.md: product code never imports a dlt type, connectors never
-construct their own HTTP client, and Temporal workflow bodies stay deterministic with no
-wall-clock time, randomness or I/O.
+The acceptance criteria are the gate, and the first one is the hardest: a certified metric must
+return the same value through Cube, the API and a dbt test — one definition, three consumers. Build
+the definition as the single source and generate the others from it, because three hand-written
+copies agree right up until they do not.
 
-The acceptance checks are the gate, and two of them are security tests rather than
-functional ones: SSRF must refuse private, loopback, link-local and redirect-to-private
-targets, and a duplicate signed webhook delivery must yield exactly one canonical fact. Also
-prove idempotency by running the same extract twice for the same row count, prove a
-malformed record is quarantined with its reason while the run still completes, and prove a
-worker restart mid-backfill resumes from checkpoint without duplicating rows.
+Hold the rules in CLAUDE.md that Phase D is most likely to break: no gap without a metric version,
+a detector version, evidence and an as-of time; no modelled money without low, base, high,
+assumptions and confidence; no analytical value or formula in a React component; and no causal
+language on anything that is not a controlled_test outcome.
 
-Every guard you add gets a test that it fails when it should — Phase B shipped a coverage
-guard that silently checked nothing for a whole phase because it walked the wrong list.
+Every guard gets a test that it fails. Phase B shipped a coverage guard that checked nothing for a
+whole phase, and Phase C shipped a tenant check that fired on correct code — both are recorded in
+build-state as the reason for the rule.
 
-Run pnpm verify, update docs/build-state.md, commit the coherent outcome and print the exact
-prompt for the next fresh session. Do not start Phase D until Phase C passes its acceptance
-checks.
+Two items in the Phase C threat-model review are blocking prerequisites rather than backlog: C1
+(upload hardening) blocks any XLSX parsing or upload-download endpoint, and C2 (the deserialisation
+lint rule) should land next. Do not add either capability without its control.
+
+Run pnpm verify, update docs/build-state.md, commit the coherent outcome and print the exact prompt
+for the next fresh session.
 ```
 
 ## CI run 1
@@ -365,3 +386,4 @@ given one for.
 | 1b | Palette | Near-black + orange, dark default, 31 contrast pairs measured rather than asserted. Both open questions closed by the repository owner. |
 | 2 | A — repository and platform | Monorepo, legacy preserved with history, health probes, tokens as code, Compose, CI skeleton. `pnpm verify` exit 0. Three items unverified for lack of a daemon. |
 | 3 | B — auth and tenancy | RLS proven against real PostgreSQL, ADR 0009, the Gap aggregate, invitations, Better Auth with the JWKS contract tested across runtimes. 132 tests. Seven real bugs found by execution — four in the auth and schema work, three more the moment Compose was started for the first time. |
+| 4 | C — data plane | Connector SDK with the 14-point contract as library code, two Tier 1 connectors, versioned mappings, the run executor, Temporal workflows, the canonical ClickHouse layer, the governed dbt layer and the ingestion boundary. 422 tests plus 19 dbt. Seven more bugs found by execution, and a threat-model review that found two controls the document claimed but the code lacked. |

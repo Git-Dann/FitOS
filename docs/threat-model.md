@@ -234,5 +234,12 @@ asserted; rate limit returns 429 with `Retry-After`.
 ## Review cadence
 
 This document is reviewed at the end of Phase C (first external data), Phase G (Tier 2 connectors)
-and Phase I (hardening). Every new trust boundary adds a threat entry with its test before the code
+and Phase I (hardening).
+
+**Phase C review completed** —
+[threat-model-review-phase-c.md](threat-model-review-phase-c.md). It found two places where this
+document claims a control that is not implemented (the decompression/XXE/malware set under T9, and
+the deserialisation lint rule under T10) and one where the implementation deliberately diverges and
+this document should be corrected instead (T7 allows http for allowlisted private hosts). Read it
+before trusting a "Controls:" line in this file. Every new trust boundary adds a threat entry with its test before the code
 that creates the boundary merges.

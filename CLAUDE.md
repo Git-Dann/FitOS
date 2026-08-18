@@ -7,11 +7,18 @@ before starting a phase. Read only the ADRs and code that phase needs.
 
 ## Current state
 
-Phases A and B are complete. The monorepo, the `uv` Python workspace, tenancy with PostgreSQL RLS,
-capability-based authorisation, the Gap aggregate, invitations and Better Auth are in place, and
-`pnpm verify` passes. Phase C (the data plane) has not started — the phase plan is in
+Phases A, B and C are complete. The monorepo, tenancy with PostgreSQL RLS, capability-based
+authorisation, the Gap aggregate, invitations, Better Auth, the connector SDK with its 14-point
+contract, two Tier 1 connectors, versioned mappings, Temporal workflows, the canonical ClickHouse
+layer and the governed dbt layer are all in place, and `pnpm verify` passes. Phase D (the semantic
+and gap engine) has not started — the phase plan is in
 [docs/implementation-plan.md](docs/implementation-plan.md), live status in
 [docs/build-state.md](docs/build-state.md).
+
+Two items from [the Phase C threat-model review](docs/threat-model-review-phase-c.md) are blocking
+prerequisites rather than backlog: upload hardening (decompression cap, XXE, malware scanning) must
+land **before** any XLSX parsing or upload-download endpoint, and the deserialisation lint rule the
+threat model promises does not yet exist.
 
 Every environment variable is documented in [docs/configuration.md](docs/configuration.md).
 Migrations need `FITOS_APP_ROLE_PASSWORD` and `FITOS_AUTH_ROLE_PASSWORD`; neither has a default,
@@ -28,10 +35,12 @@ yet implemented exit non-zero with an "added in Phase X" message; that is delibe
 | `pnpm verify` | **The phase gate.** format, lint, typecheck, unit tests, token contrast, ruff, mypy, pytest |
 | `pnpm build` | Turborepo build across the workspace |
 | `pnpm dev` | web on :3000, api on :8000 |
-| `pnpm dev:infra` | Compose up, waits for health. **Authored but never started — no Docker daemon was available when it was written.** Verify before relying on it |
+| `pnpm dev:infra` | Compose up, waits for health. 7/7 in 18s. `dev:infra:status` · `dev:infra:footprint` |
 | `pnpm test:tokens` | 31 contrast pairs across both themes |
-| `pnpm test:data` | 53 canonical contract tests. Needs ClickHouse; set `FITOS_REQUIRE_CLICKHOUSE=1` to turn a skip into a failure |
-| `uv run pytest services/api/tests` | 159 tests. Needs `FITOS_TEST_DATABASE_URL`; without it the tenancy suite **skips**, so set `FITOS_REQUIRE_DB_TESTS=1` to turn a skip into a failure |
+| `pnpm test:data` | 59 canonical and governed-model tests. Needs ClickHouse; set `FITOS_REQUIRE_CLICKHOUSE=1` to turn a skip into a failure |
+| `uv run pytest` | 422 tests. Needs `FITOS_TEST_DATABASE_URL`; without it the tenancy suite **skips**, so set `FITOS_REQUIRE_DB_TESTS=1` to turn a skip into a failure |
+| `pnpm canonical:apply` | Creates the 12 canonical ClickHouse tables. Idempotent; run it before dbt |
+| `pnpm dbt:build` · `dbt:test` | 3 governed models, 16 dbt tests |
 | `pnpm lint:py` · `typecheck:py` · `test:unit:py` | ruff · mypy · pytest |
 
 ### Not yet implemented
