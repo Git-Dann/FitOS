@@ -77,7 +77,7 @@ without the fix.
 | 6 | A gap can be assigned, actioned and resolved with an outcome through the API, with audit rows | `test_vertical_slice.py` asserts the full six-row audit trail in order |
 | 7 | A detector run record captures versions, query hash, window, thresholds, candidates, suppressions, dedupe decisions, duration and errors | `detector_runs` (migration 0007). Written on every run, including ones that found nothing or failed |
 | 8 | Exposure fields are absent from a `frontline` token's payload | Absent, not null and not zero. Two tests: one on the keys, one on the raw response text so a renamed or nested copy fails too |
-| 9 | The twelve detector classes | **Partial — 5 of 12.** Scoped below |
+| 9 | The twelve detector classes | **Partial — 6 of 12.** Scoped below |
 
 ## completed_outcomes
 
@@ -431,13 +431,13 @@ given one for.
 
 ## Phase D remainder
 
-Five detector classes are implemented: source mismatch, ratio threshold, freshness, completeness and
-schema drift. That is the position [docs/spec-review.md](spec-review.md) T3 records deliberately —
+Six detector classes are implemented: source mismatch, ratio threshold, freshness, completeness,
+schema drift and attribution comparison. That is the position [docs/spec-review.md](spec-review.md) T3 records deliberately —
 build the slice completely against the full interface, then add the rest — and the five chosen are
 the ones the slice and the suppression machinery need.
 
-Seven remain: peer/baseline comparison, funnel drop, financial leakage, attribution comparison
-(low confidence by construction), identity match, trend break and staffing ratio. Each is a config
+Six remain: peer/baseline comparison, funnel drop, financial leakage, identity match, trend break
+and staffing ratio. Each is a config
 plus a `detect` method against an interface that already exists; the framework behaviours they share
 — sufficiency refusal, ordering, error isolation, run records — are written and tested once, so a
 new class inherits them rather than reimplementing them.

@@ -35,6 +35,11 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from fitos_worker.detectors.attribution import (
+    AttributionConfig,
+    AttributionDetector,
+    AttributionMethod,
+)
 from fitos_worker.detectors.base import (
     Detector,
     DetectorContext,
@@ -228,7 +233,45 @@ def _schema_drift() -> tuple[Detector, list[MetricReading]]:
     return detector, readings
 
 
+def _attribution() -> tuple[Detector, list[MetricReading]]:
+    detector = AttributionDetector(
+        AttributionConfig(
+            rule_id=RULE,
+            version=1,
+            pack_key="test_pack",
+            gap_type="campaign_below_baseline",
+            canonical_entity="fact_campaign_spend",
+            metric_name="Attributable orders per pound",
+            attribution_method=AttributionMethod.LAST_TOUCH,
+            expected_ratio=Decimal("1.00"),
+            threshold_ratio=Decimal("0.80"),
+            severity_high_ratio=Decimal("0.50"),
+            attributable_share_low=Decimal("0.20"),
+            attributable_share_base=Decimal("0.40"),
+            attributable_share_high=Decimal("0.70"),
+        )
+    )
+    readings = [
+        MetricReading(
+            metric_key="attributable_orders_per_pound",
+            metric_version=1,
+            query_hash="golden-attribution",
+            dimensions={"campaign_id": campaign},
+            value=Decimal(value),
+            denominator=denominator,
+            captured_at=WINDOW.end,
+        )
+        for campaign, value, denominator in [
+            ("campaign-healthy", "1.10", 900),
+            ("campaign-soft", "0.62", 900),
+            ("campaign-poor", "0.28", 1200),
+        ]
+    ]
+    return detector, readings
+
+
 CASES = {
+    "attribution": _attribution,
     "source_mismatch": _source_mismatch,
     "ratio_threshold": _ratio_threshold,
     "freshness": _freshness,
