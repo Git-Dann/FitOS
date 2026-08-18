@@ -30,12 +30,13 @@ yet implemented exit non-zero with an "added in Phase X" message; that is delibe
 | `pnpm dev` | web on :3000, api on :8000 |
 | `pnpm dev:infra` | Compose up, waits for health. **Authored but never started — no Docker daemon was available when it was written.** Verify before relying on it |
 | `pnpm test:tokens` | 31 contrast pairs across both themes |
-| `uv run pytest services/api/tests` | 132 tests. Needs `FITOS_TEST_DATABASE_URL`; without it the tenancy suite **skips**, so set `FITOS_REQUIRE_DB_TESTS=1` to turn a skip into a failure |
+| `pnpm test:data` | 53 canonical contract tests. Needs ClickHouse; set `FITOS_REQUIRE_CLICKHOUSE=1` to turn a skip into a failure |
+| `uv run pytest services/api/tests` | 159 tests. Needs `FITOS_TEST_DATABASE_URL`; without it the tenancy suite **skips**, so set `FITOS_REQUIRE_DB_TESTS=1` to turn a skip into a failure |
 | `pnpm lint:py` · `typecheck:py` · `test:unit:py` | ruff · mypy · pytest |
 
 ### Not yet implemented
 
-`test:e2e` · `test:visual` (Phase E) · `test:data` (Phase D) · `demo:seed` · `demo:reset` ·
+`test:e2e` · `test:visual` (Phase E) · `demo:seed` · `demo:reset` ·
 `demo:snapshot` · `demo:purge` · `demo:verify` (Phase F). Each exits non-zero rather than
 succeeding silently.
 

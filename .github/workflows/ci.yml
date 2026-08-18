@@ -106,6 +106,34 @@ jobs:
       - run: uv sync --all-packages --frozen
       - run: uv run pytest services/api/tests/test_jwks_contract.py -q
 
+  canonical:
+    name: Canonical contract (ClickHouse)
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8-alpine
+        env:
+          CLICKHOUSE_USER: fitos
+          CLICKHOUSE_PASSWORD: fitos_local_only
+          CLICKHOUSE_DB: fitos
+        ports: ["8123:8123"]
+        options: >-
+          --health-cmd "wget --spider -q http://127.0.0.1:8123/ping"
+          --health-interval 5s --health-timeout 3s --health-retries 30
+    env:
+      FITOS_CLICKHOUSE_URL: http://127.0.0.1:8123/
+      # The physical rules are the difference between a warehouse that answers
+      # in milliseconds and one that answers eventually, and none of them can be
+      # checked without a server. A skip here would read as a passing contract.
+      FITOS_REQUIRE_CLICKHOUSE: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --frozen
+      - run: uv run pytest data -q
+
   build:
     name: Production build
     runs-on: ubuntu-latest

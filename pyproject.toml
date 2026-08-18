@@ -33,6 +33,12 @@ select = ["E", "F", "I", "N", "UP", "B", "S", "C4", "SIM", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101", "S105", "S106", "S603"]
 "**/contract_tests.py" = ["S101"]
+# The canonical tests interrogate ClickHouse's system tables, building queries
+# from table names that come from data/canonical/schema.py — our own module
+# constants, never a request. S608 is about untrusted interpolation and there is
+# none here. S310 is the urllib call to a URL from configuration, which is the
+# whole point of an integration test.
+"data/canonical/tests/*" = ["S101", "S310", "S608"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -40,8 +46,9 @@ strict = true
 warn_unreachable = true
 
 [tool.pytest.ini_options]
-testpaths = ["services", "connectors"]
+testpaths = ["services", "connectors", "data"]
 asyncio_mode = "auto"
+pythonpath = ["data"]
 markers = [
   "integration: requires running infrastructure (postgres, clickhouse, minio, temporal)",
 ]
