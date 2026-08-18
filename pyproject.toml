@@ -23,8 +23,9 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "S", "C4", "SIM", "RUF"]
-# S101 (assert) is legitimate in tests; enforced everywhere else.
-per-file-ignores = { "**/test_*.py" = ["S101"] }
+# assert, subprocess and hard-coded local passwords are all legitimate in
+# tests; every one of them stays enforced in application code.
+per-file-ignores = { "**/tests/**" = ["S101", "S105", "S106", "S603"] }
 
 [tool.mypy]
 python_version = "3.11"
