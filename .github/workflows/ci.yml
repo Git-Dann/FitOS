@@ -75,6 +75,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          # setup-node@v5 enables package-manager caching by default and
+          # auto-detects the manager from the repository root, which is pnpm.
+          # This job is the one place that uses npm — the legacy tree keeps its
+          # own package-lock.json outside the workspace — and it never installs
+          # pnpm, so the auto-detection fails the job before any step runs.
+          package-manager-cache: false
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit

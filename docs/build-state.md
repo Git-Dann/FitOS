@@ -171,10 +171,25 @@ The threshold stays at `high`; a comment in the workflow records why.
 Two secondary findings from the same run:
 
 - **The secret scan never ran.** Steps are sequential, so the audit failure aborted the
-  job before gitleaks. It executes for the first time on the next run — until then, "the
-  repository has been secret-scanned" is not a claim that can be made.
+  job before gitleaks.
 - `actions/checkout@v4` and `actions/setup-node@v4` emitted Node 20 deprecation warnings;
   both bumped to v5.
+
+## CI run 2
+
+On `8bede8d`. The audit gate passed with no known vulnerabilities, and **gitleaks executed
+for the first time and found nothing** — the repository has now genuinely been
+secret-scanned, which was not true after run 1.
+
+One job failed, and the cause was the action bump made in the same commit rather than
+anything in the code: `actions/setup-node@v5` enables package-manager caching by default
+and auto-detects the manager from the repository root, which is pnpm. The `legacy` job is
+the only one that uses npm — the legacy tree keeps its own lockfile outside the workspace —
+and it never installs pnpm, so setup-node failed before any step ran and skipped the rest
+of the job. Fixed with `package-manager-cache: false` on that job.
+
+Worth noting because it will recur: a job whose package manager differs from the
+repository default needs that input set explicitly under setup-node v5.
 
 ## next_phase
 
