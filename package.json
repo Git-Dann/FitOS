@@ -14,11 +14,11 @@
     "dev:infra:footprint": "bash infra/scripts/dev-infra.sh footprint",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "lint:py": "uv run ruff check services && uv run ruff format --check services && uv run python services/api/tools/check_no_role_comparisons.py services",
+    "lint:py": "uv run ruff check services connectors data && uv run ruff format --check services connectors data && uv run python services/api/tools/check_no_role_comparisons.py services connectors data",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,yaml,yml}\"",
     "typecheck": "turbo run typecheck",
-    "typecheck:py": "uv run mypy services",
+    "typecheck:py": "uv run mypy services connectors data",
     "test": "turbo run test",
     "test:unit": "turbo run test:unit",
     "test:unit:py": "uv run pytest -m 'not integration'",
@@ -35,7 +35,8 @@
     "demo:verify": "echo 'demo:verify — added in Phase F' && exit 1",
     "dbt:build": "cd data/dbt && DBT_PROFILES_DIR=. uv run dbt build",
     "dbt:test": "cd data/dbt && DBT_PROFILES_DIR=. uv run dbt test",
-    "canonical:apply": "PYTHONPATH=data uv run python -m canonical.apply"
+    "canonical:apply": "PYTHONPATH=data uv run python -m canonical.apply",
+    "metrics:compile": "PYTHONPATH=data uv run python -m metrics.compile"
   },
   "devDependencies": {
     "prettier": "3.6.2",

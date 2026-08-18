@@ -1,0 +1,35 @@
+key: stock_discrepancy_rate
+name: Stock discrepancy rate
+description: >
+  The share of manual stock checks where what a person counted differs from what the
+  system believed, measured against the most recent inventory snapshot taken at or
+  before the count. This is the primary metric behind the Stock Truth Gap.
+owner: retail-pack
+version: 1
+
+grain: [organization_id, location_id]
+# The formula exists once. Nothing downstream re-implements it, and no React
+# component may contain it at all.
+measure_expression: >
+  countIf(abs(discrepancy) > 0) / nullIf(count(), 0)
+dimensions: [location_id, product_variant_id]
+allowed_filters: [location_id, product_variant_id]
+source_models: [gov_stock_truth]
+
+unit: ratio
+currency_policy: not_applicable
+timezone_policy: organization_display_timezone
+null_policy: exclude_null_denominator
+
+valid_from: 2026-01-01
+valid_to: null
+
+sensitivity: internal
+quality_tests: [not_null, between_0_and_1, denominator_min_30]
+
+# Executable. These run against seeded data as golden tests; an example that is
+# never executed is a comment that ages badly.
+examples:
+  - filters: { location_id: "NS-014" }
+    expected: 1.0
+    tolerance: 0.0001

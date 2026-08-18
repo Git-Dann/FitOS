@@ -1,0 +1,30 @@
+key: stock_units_missing
+name: Stock units missing
+description: >
+  Total units the system believed were present but a person could not find. Counts only
+  positive discrepancies: a surplus is a different problem with a different cause, and
+  netting the two against each other hides both.
+owner: retail-pack
+version: 1
+
+grain: [organization_id, location_id]
+measure_expression: >
+  sum(if(discrepancy > 0, discrepancy, 0))
+dimensions: [location_id, product_variant_id]
+allowed_filters: [location_id, product_variant_id]
+source_models: [gov_stock_truth]
+
+unit: count
+currency_policy: not_applicable
+null_policy: propagate
+
+valid_from: 2026-01-01
+valid_to: null
+
+sensitivity: internal
+quality_tests: [not_null, non_negative]
+
+examples:
+  - filters: { location_id: "NS-014" }
+    expected: 7.0
+    tolerance: 0.0001

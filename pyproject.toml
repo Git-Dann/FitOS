@@ -19,6 +19,7 @@ dev-dependencies = [
   # models are built by a pipeline, never by the API or the worker.
   "dbt-core>=1.9",
   "dbt-clickhouse>=1.8",
+  "types-PyYAML>=6.0",
 ]
 
 [tool.ruff]
@@ -42,7 +43,16 @@ select = ["E", "F", "I", "N", "UP", "B", "S", "C4", "SIM", "RUF"]
 # constants, never a request. S608 is about untrusted interpolation and there is
 # none here. S310 is the urllib call to a URL from configuration, which is the
 # whole point of an integration test.
+# Same reasoning for the metric tests: they seed ClickHouse and interrogate it
+# with queries built from module constants and validated definitions.
 "data/canonical/tests/*" = ["S101", "S310", "S608"]
+"data/metrics/tests/*" = ["S101", "S310", "S608"]
+# compile.py generates SQL, which is what it is for. Every interpolated value
+# comes from a validated MetricDefinition — measure_expression is checked
+# against a forbidden-pattern list at parse time, and the severity is chosen
+# from a fixed set in this module. There is no request-supplied input on this
+# path at all.
+"data/metrics/compile.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.11"

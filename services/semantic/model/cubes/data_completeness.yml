@@ -1,0 +1,36 @@
+# GENERATED FILE — do not edit.
+#
+# Produced from data/metrics/definitions/data_completeness.yml by data/metrics/compile.py.
+# Edit the definition and run `pnpm metrics:compile`. A hand-edit here is
+# reverted the next time anyone runs it, silently.
+
+cubes:
+  - name: data_completeness
+    sql_table: gov_data_quality
+    description: >
+      Accepted records as a share of all records a source delivered in the window, rejected included. A first-class metric rather than an operational statistic, because that is what lets a data-quality gap suppress a business gap through the same machinery.
+
+    measures:
+      data_completeness:
+        type: number
+        sql: "sum(accepted_records) / nullIf(sum(total_records), 0)"
+        description: "Accepted records as a share of all records a source delivered in the window, rejected included. A first-class metric rather than an operational statistic, because that is what lets a data-quality gap suppress a business gap through the same machinery."
+        meta:
+          metric_version: 1
+          unit: ratio
+          certified: true
+          exposure_bearing: false
+
+    dimensions:
+      organization_id:
+        type: string
+        sql: organization_id
+        # Never selectable. The tenant filter is applied for the caller; being
+        # able to group by it is how one tenant learns another exists.
+        public: false
+      day:
+        type: string
+        sql: day
+      source_key:
+        type: string
+        sql: source_key

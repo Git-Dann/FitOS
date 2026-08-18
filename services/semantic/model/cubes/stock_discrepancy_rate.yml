@@ -1,0 +1,36 @@
+# GENERATED FILE — do not edit.
+#
+# Produced from data/metrics/definitions/stock_discrepancy_rate.yml by data/metrics/compile.py.
+# Edit the definition and run `pnpm metrics:compile`. A hand-edit here is
+# reverted the next time anyone runs it, silently.
+
+cubes:
+  - name: stock_discrepancy_rate
+    sql_table: gov_stock_truth
+    description: >
+      The share of manual stock checks where what a person counted differs from what the system believed, measured against the most recent inventory snapshot taken at or before the count. This is the primary metric behind the Stock Truth Gap.
+
+    measures:
+      stock_discrepancy_rate:
+        type: number
+        sql: "countIf(abs(discrepancy) > 0) / nullIf(count(), 0)"
+        description: "The share of manual stock checks where what a person counted differs from what the system believed, measured against the most recent inventory snapshot taken at or before the count. This is the primary metric behind the Stock Truth Gap."
+        meta:
+          metric_version: 1
+          unit: ratio
+          certified: true
+          exposure_bearing: false
+
+    dimensions:
+      organization_id:
+        type: string
+        sql: organization_id
+        # Never selectable. The tenant filter is applied for the caller; being
+        # able to group by it is how one tenant learns another exists.
+        public: false
+      location_id:
+        type: string
+        sql: location_id
+      product_variant_id:
+        type: string
+        sql: product_variant_id
