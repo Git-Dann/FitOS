@@ -387,3 +387,26 @@ given one for.
 | 2 | A — repository and platform | Monorepo, legacy preserved with history, health probes, tokens as code, Compose, CI skeleton. `pnpm verify` exit 0. Three items unverified for lack of a daemon. |
 | 3 | B — auth and tenancy | RLS proven against real PostgreSQL, ADR 0009, the Gap aggregate, invitations, Better Auth with the JWKS contract tested across runtimes. 132 tests. Seven real bugs found by execution — four in the auth and schema work, three more the moment Compose was started for the first time. |
 | 4 | C — data plane | Connector SDK with the 14-point contract as library code, two Tier 1 connectors, versioned mappings, the run executor, Temporal workflows, the canonical ClickHouse layer, the governed dbt layer and the ingestion boundary. 422 tests plus 19 dbt. Seven more bugs found by execution, and a threat-model review that found two controls the document claimed but the code lacked. |
+
+## Open product questions from the fulfilment port (Phase D)
+
+Both were found by a differential check of the ported routing engine against
+`legacy/fitos-prototype` over 3,888 input combinations, and both are *shipped*
+prototype behaviour. They are preserved rather than changed, because
+docs/product-spec.md §7 says the prototype's semantics carry forward and
+changing them is a product decision.
+
+1. **At Amber, a batched pick outranks staff delivery for a customer with an
+   accessibility need.** `batch_pick` scores 88 against staff delivery's 63.
+   §7.4's override applies only at Red, where the route is actually withheld, so
+   it does not intervene here. A batched pick adds the batch window (8 minutes
+   by default) to the wait.
+
+2. **At Red with a companion present, companion collection outranks the restored
+   staff delivery.** 91 against 82. The prototype's golden test does not cover
+   this — its fixture has no companion — so the guarantee it appears to assert
+   is fixture-dependent. A companion collecting may well be the better outcome;
+   the point is that nothing currently states which is intended.
+
+Both are covered by named tests that assert the current behaviour, so changing
+either is a deliberate edit to a test that says what it is protecting.
