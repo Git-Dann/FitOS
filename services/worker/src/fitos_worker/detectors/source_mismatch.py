@@ -1,9 +1,16 @@
-"""Source mismatch — the Stock Truth Gap.
+"""Source mismatch.
 
-Two systems claim to describe the same physical thing and disagree. The retail
-instance is the one the vertical slice is built around: the inventory system
-says a location holds N units of a variant, somebody counted it, and the two
-numbers differ.
+Two systems claim to describe the same physical thing and disagree. The Stock
+Truth Gap is the instance the vertical slice is built around: an inventory
+system says a location holds N units of a variant, somebody counted it, and the
+two numbers differ.
+
+The class is generic and the pack supplies the specifics. Gap type, copy,
+canonical entity and the recommended action all come from configuration, because
+a pack contract that lets a detector hard-code one domain's vocabulary is a
+contract the second pack has to fork the detector to satisfy. The core names no
+pack (docs/product-spec.md §5), and `test_pack_contract.py` enforces that
+rather than trusting it.
 
 The detector's job is deciding when a disagreement is a *finding* rather than
 noise, and the interesting decisions are all refusals:
@@ -15,8 +22,8 @@ raising a low-confidence gap conflates them. The refusal happens in
 `Detector.sufficient`, so every detector refuses identically.
 
 **It compares against the metric's expected value, not against zero.** Some
-discrepancy is normal in every retail estate; a detector anchored at zero fires
-on every location forever and is muted within a week.
+discrepancy is normal in any estate of any size; a detector anchored at zero
+fires on every scope forever and is muted within a week.
 
 **It never states a cause.** The title says the two sources disagree. It does
 not say shrinkage, miscount or theft — the metric establishes a disagreement and
@@ -66,9 +73,28 @@ class SourceMismatchConfig(DetectorConfig):
     to 8%.
     """
 
+    # Everything a pack supplies. No default names a pack: a detector class that
+    # hard-codes one domain's vocabulary has to be forked for the second pack.
+    gap_type: str = Field(min_length=1)
+    canonical_entity: str = Field(min_length=1)
     scope_dimension: str = "location_id"
     scope_type: ScopeType = ScopeType.LOCATION
-    canonical_entity: str = "fact_stock_count"
+
+    # Copy templates. `{scope_id}`, `{rate}`, `{observations}` are substituted.
+    title_template: str = "Sources disagree at {scope_id} ({rate} of checks)"
+    summary_template: str = (
+        "{rate} of {observations} checks in this window found a value different from "
+        "the system record. The two sources disagree; which one is right is not "
+        "established by this metric."
+    )
+
+    # The action a pack recommends. An investigation, never a diagnosis.
+    action_key: str = "investigate_disagreement"
+    action_title: str = "Re-check the affected records"
+    action_rationale: str = (
+        "Confirms which of the two sources is wrong before anything is adjusted."
+    )
+    action_playbook_id: str = Field(min_length=1)
 
     # The rate a healthy estate runs at. Not zero: some discrepancy is normal
     # everywhere, and a detector anchored at zero fires on every location.
@@ -95,12 +121,12 @@ class SourceMismatchDetector(Detector):
     """Two sources disagree about the same physical quantity."""
 
     key = "source_mismatch"
-    gap_type = "stock_truth_mismatch"
     config_model = SourceMismatchConfig
 
     def __init__(self, config: SourceMismatchConfig) -> None:
         super().__init__(config)
         self.config: SourceMismatchConfig = config
+        self.gap_type = config.gap_type
 
     def detect(
         self, readings: Sequence[MetricReading], context: DetectorContext
@@ -156,16 +182,13 @@ class SourceMismatchDetector(Detector):
             reason_codes=("source_disagreement", *exposure.reason_codes),
             recommended_actions=(
                 {
-                    "key": "recount_location",
-                    "title": "Recount the affected variants",
+                    "key": config.action_key,
+                    "title": config.action_title,
                     # An investigation, not a diagnosis. The metric establishes a
-                    # disagreement; it does not establish shrinkage, miscount or
-                    # theft, and the copy must not imply one.
-                    "rationale": (
-                        "Confirms whether the disagreement is in the count or in the "
-                        "inventory record before anything is adjusted."
-                    ),
-                    "playbook_id": "retail.stock_truth.recount",
+                    # disagreement; it does not establish a cause, and the copy
+                    # must not imply one.
+                    "rationale": config.action_rationale,
+                    "playbook_id": config.action_playbook_id,
                 },
             ),
             data_freshness_seconds=freshness_seconds,
@@ -244,24 +267,18 @@ class SourceMismatchDetector(Detector):
         return compute_exposure(
             inputs=inputs,
             currency=config.exposure_currency,
-            formula_key="stock_truth_exposure",
+            formula_key=f"{config.gap_type}_exposure",
             formula_version=config.exposure_formula_version,
             confidence_band=confidence.band,
         )
 
     # -- copy --------------------------------------------------------------
 
-    @staticmethod
-    def _title(scope_id: str, rate: Decimal) -> str:
-        return f"Stock records and counts disagree at {scope_id} ({rate:.1%} of checks)"
+    def _title(self, scope_id: str, rate: Decimal) -> str:
+        return self.config.title_template.format(scope_id=scope_id, rate=f"{rate:.1%}")
 
-    @staticmethod
-    def _summary(rate: Decimal, observations: int) -> str:
-        return (
-            f"{rate:.1%} of {observations} stock checks in this window found a quantity "
-            f"different from the inventory record. The two sources disagree; which one is "
-            f"right is not established by this metric."
-        )
+    def _summary(self, rate: Decimal, observations: int) -> str:
+        return self.config.summary_template.format(rate=f"{rate:.1%}", observations=observations)
 
     def _severity(self, rate: Decimal) -> Severity:
         if rate >= self.config.severity_critical_rate:

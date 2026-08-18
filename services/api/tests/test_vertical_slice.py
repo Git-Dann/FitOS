@@ -33,9 +33,10 @@ from fitos_api.gaps.writer import (
     record_detector_run,
     update_gap,
 )
+from fitos_pack_retail import PACK_KEY, stock_truth_rule
 from fitos_worker.detectors.base import DetectorContext, MetricReading, ObservationWindow
 from fitos_worker.detectors.pipeline import DedupeDecision, OpenGap, reconcile
-from fitos_worker.detectors.source_mismatch import SourceMismatchConfig, SourceMismatchDetector
+from fitos_worker.detectors.source_mismatch import SourceMismatchDetector
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -69,9 +70,10 @@ def _run_detector_for_day(session: Session, organization_id: uuid.UUID, day: int
         start=datetime(2026, 8, day, tzinfo=UTC), end=datetime(2026, 8, day + 1, tzinfo=UTC)
     )
     context = DetectorContext(organization_id=organization_id, window=window, as_of=window.end)
-    detector = SourceMismatchDetector(
-        SourceMismatchConfig(rule_id=RULE_ID, version=1, pack_key="retail_omnichannel")
-    )
+    # The pack supplies the vocabulary; the class is generic. Going through the
+    # pack here rather than hand-building a config is what makes this a test of
+    # the shipped path.
+    detector = SourceMismatchDetector(stock_truth_rule(rule_id=RULE_ID))
 
     started = datetime.now(UTC)
     result = detector.run([_reading(day, DAILY_RATES[day - 1])], context)
@@ -108,7 +110,7 @@ def _run_detector_for_day(session: Session, organization_id: uuid.UUID, day: int
         run_id=run_id,
         organization_id=organization_id,
         detector_key=detector.key,
-        pack_key="retail_omnichannel",
+        pack_key=PACK_KEY,
         rule_id=RULE_ID,
         rule_version=1,
         config_fingerprint=detector.config.fingerprint(),

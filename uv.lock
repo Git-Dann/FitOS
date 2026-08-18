@@ -15,6 +15,7 @@ members = [
     "fitos-connector-rest",
     "fitos-connector-sdk",
     "fitos-data",
+    "fitos-pack-retail",
     "fitos-worker",
 ]
 
@@ -953,6 +954,17 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
+
+[[package]]
+name = "fitos-pack-retail"
+version = "0.0.0"
+source = { editable = "packs/retail" }
+dependencies = [
+    { name = "fitos-worker" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "fitos-worker", editable = "services/worker" }]
 
 [[package]]
 name = "fitos-worker"

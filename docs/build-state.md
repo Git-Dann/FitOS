@@ -410,3 +410,11 @@ changing them is a product decision.
 
 Both are covered by named tests that assert the current behaviour, so changing
 either is a deliberate edit to a test that says what it is protecting.
+
+## Deferred to Phase E
+
+**Fulfilment copy still lives in the core.** The customer-facing explanations in
+`services/api/src/fitos_api/fulfilment/policy.py` are product copy and belong in
+`packs/retail` with the rest of it. They are pack-neutral today and
+`packs/retail/tests/test_pack_contract.py` keeps them that way, so nothing is
+broken — but the move should happen when the UI copy lands.

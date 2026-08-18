@@ -66,7 +66,26 @@ def mismatch(**overrides: object) -> SourceMismatchDetector:
     config: dict[str, object] = {
         "rule_id": RULE,
         "version": 1,
-        "pack_key": "retail_omnichannel",
+        # A stand-in pack. The detector class is generic, so these tests supply
+        # their own vocabulary rather than importing a real pack — a core test
+        # that depended on `packs/retail` would invert the contract it is
+        # supposed to protect.
+        "pack_key": "test_pack",
+        "gap_type": "stock_truth_mismatch",
+        "canonical_entity": "fact_stock_count",
+        "action_playbook_id": "test_pack.stock_truth.recount",
+        "title_template": ("Stock records and counts disagree at {scope_id} ({rate} of checks)"),
+        "summary_template": (
+            "{rate} of {observations} stock checks in this window found a quantity "
+            "different from the inventory record. The two sources disagree; which one "
+            "is right is not established by this metric."
+        ),
+        "action_key": "recount_location",
+        "action_title": "Recount the affected variants",
+        "action_rationale": (
+            "Confirms whether the disagreement is in the count or in the inventory "
+            "record before anything is adjusted."
+        ),
     }
     config.update(overrides)
     return SourceMismatchDetector(SourceMismatchConfig(**config))  # type: ignore[arg-type]

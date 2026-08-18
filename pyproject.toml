@@ -13,6 +13,7 @@ members = [
   "connectors/csv_upload",
   "connectors/rest",
   "data",
+  "packs/retail",
 ]
 
 [tool.uv]
@@ -67,7 +68,7 @@ strict = true
 warn_unreachable = true
 
 [tool.pytest.ini_options]
-testpaths = ["services", "connectors", "data"]
+testpaths = ["services", "connectors", "data", "packs"]
 asyncio_mode = "auto"
 markers = [
   "integration: requires running infrastructure (postgres, clickhouse, minio, temporal)",

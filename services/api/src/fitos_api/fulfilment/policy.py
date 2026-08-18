@@ -48,6 +48,11 @@ and stock-truth gap families rather than disappearing into a UI string.
 **Stock confidence stays ordinal** (§7.1). `Confirmed > Likely > Check`, compared
 by rank against a tenant minimum. Availability is a claim with a confidence,
 never a fact, and a boolean would erase exactly that.
+
+The customer-facing explanations are still here rather than in the pack, and
+`test_pack_contract.py` keeps them free of pack vocabulary. They belong with the
+rest of the product copy and should move to `packs/retail` when the UI copy
+lands in Phase E; recorded in docs/build-state.md rather than left implicit.
 """
 
 from __future__ import annotations
@@ -304,7 +309,7 @@ def rank_fulfilment(
             Method.HOME_DELIVERY,
             SCORE_HOME_DELIVERY_WITH_STOCK if stock_ready else SCORE_HOME_DELIVERY_WITHOUT_STOCK,
             0,
-            "This option is available for home delivery after your fitting-room visit.",
+            "This option is available for home delivery after your visit.",
         )
 
     if not stock_ready:
@@ -405,7 +410,7 @@ def _offer_stocked_routes(
         if request.timing_preference is TimingPreference.BEFORE_I_FINISH
         else SCORE_BEFORE_I_FINISH,
         direct_minutes + 3,
-        "The request is timed to arrive before you finish your current fitting-room session.",
+        "The request is timed to arrive before you finish your current session.",
     )
     offer(
         Method.COLLECT_AT_CHECKOUT,
