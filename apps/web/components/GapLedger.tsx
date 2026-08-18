@@ -16,13 +16,12 @@
  * appears only when the list gets long enough to matter.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { GapStatus } from "@fitos/contracts/lifecycle";
 import type { DemoGap, Severity } from "@/lib/demo-gaps";
 import { groupBySeverity } from "@/lib/demo-gaps";
 import { ConfidenceMeter, ExposureCell, SeverityChip, StatusChip } from "./chips";
 import { PeekPanel } from "./PeekPanel";
 import { age, shortDate } from "@/lib/format";
-import { assign, transition, type LedgerState } from "@/lib/ledger-state";
+import type { AuditEntry } from "@/lib/ledger-state";
 import type { TransitionRequest } from "./TransitionControls";
 
 interface IndexedGroup {
@@ -30,30 +29,36 @@ interface IndexedGroup {
   rows: { gap: DemoGap; index: number }[];
 }
 
+/**
+ * Presentational. It renders the gaps it is given and reports intent upward.
+ *
+ * It deliberately does not hold its own copy of the list. An earlier version
+ * seeded `useState` from the `gaps` prop, which meant the ledger rendered a
+ * snapshot taken at mount and silently ignored every filter, search and role
+ * change above it — the controls moved and nothing happened. Derived state in
+ * `useState` initialises once; that is the whole trap.
+ */
 export function GapLedger({
   gaps,
   capabilities,
+  audit,
+  onAssign,
+  onTransition,
 }: {
   gaps: DemoGap[];
   capabilities: readonly string[];
+  audit: Record<string, AuditEntry[]>;
+  onAssign: (gapId: string, owner: string | null) => void;
+  onTransition: (gapId: string, request: TransitionRequest) => void;
 }) {
-  const [state, setState] = useState<LedgerState>({ gaps, audit: {} });
-
-  // Terminal gaps leave the inbox, which is what makes dismissal feel like the
-  // consequential act it is. They are not deleted — the gaps route shows them.
-  const open = useMemo(
-    () => state.gaps.filter((gap) => gap.status !== "resolved" && gap.status !== "dismissed"),
-    [state.gaps],
-  );
-
   const { groups, total } = useMemo(() => {
     let cursor = 0;
-    const indexed: IndexedGroup[] = groupBySeverity(open).map((group) => ({
+    const indexed: IndexedGroup[] = groupBySeverity(gaps).map((group) => ({
       severity: group.severity,
       rows: group.gaps.map((gap) => ({ gap, index: cursor++ })),
     }));
     return { groups: indexed, total: cursor };
-  }, [open]);
+  }, [gaps]);
 
   const flat = useMemo(() => groups.flatMap((group) => group.rows.map((row) => row.gap)), [groups]);
 
@@ -179,13 +184,9 @@ export function GapLedger({
         <PeekPanel
           gap={active}
           capabilities={capabilities}
-          audit={state.audit[active.id] ?? []}
-          onAssign={(owner) => setState((current) => assign(current, active.id, owner))}
-          onTransition={(request: TransitionRequest) =>
-            setState((current) =>
-              transition(current, active.id, request as { to: GapStatus }, capabilities),
-            )
-          }
+          audit={audit[active.id] ?? []}
+          onAssign={(owner) => onAssign(active.id, owner)}
+          onTransition={(request) => onTransition(active.id, request)}
           onClose={() => setPeekOpen(false)}
         />
       ) : null}

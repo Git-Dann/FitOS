@@ -10,6 +10,7 @@
  * §2 (accent discipline) — accent is reserved for interaction. Severity uses
  * the status ramp; nothing here borrows accent to look urgent.
  */
+import { hasExposure } from "@/lib/demo-gaps";
 import type { ConfidenceBand, DemoGap, GapStatus, Severity } from "@/lib/demo-gaps";
 import { exposureRange, money } from "@/lib/format";
 
@@ -87,8 +88,10 @@ export function ConfidenceMeter({ band, score }: { band: ConfidenceBand; score: 
  * inventing it.
  */
 export function ExposureCell({ gap }: { gap: DemoGap }) {
-  if (gap.exposureLow === null || gap.exposureHigh === null || !gap.currency) {
-    return <span className="exposure-none">no exposure</span>;
+  if (!hasExposure(gap)) {
+    // Two different sentences, and they must not look alike: a gap with no
+    // monetary figure, versus a caller who may not see one.
+    return <span className="exposure-none">{gap.exposureLow === null ? "no exposure" : "—"}</span>;
   }
   return (
     <span className="exposure">
@@ -104,6 +107,6 @@ export function ExposureCell({ gap }: { gap: DemoGap }) {
 }
 
 export function ExposureBase({ gap }: { gap: DemoGap }) {
-  if (gap.exposureBase === null || !gap.currency) return null;
+  if (typeof gap.exposureBase !== "number" || !gap.currency) return null;
   return <>{money(gap.exposureBase, gap.currency)}</>;
 }

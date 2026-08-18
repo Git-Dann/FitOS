@@ -72,12 +72,19 @@ export interface DemoGap {
   observedLabel: string;
   expectedLabel: string;
 
-  /** Integer minor units, or null when the gap carries no money — which is a
-   *  complete gap, not a missing one. */
-  exposureLow: number | null;
-  exposureBase: number | null;
-  exposureHigh: number | null;
-  currency: string | null;
+  /**
+   * Integer minor units. `null` when the gap carries no money — a complete gap,
+   * not a missing one — and *absent* when the caller may not see exposure at
+   * all, because the API removes the fields rather than nulling them.
+   *
+   * Both states are representable on purpose. Collapsing them would make "this
+   * gap has no monetary figure" indistinguishable from "you are not allowed to
+   * know", and those are very different sentences.
+   */
+  exposureLow?: number | null;
+  exposureBase?: number | null;
+  exposureHigh?: number | null;
+  currency?: string | null;
   isModelled: boolean;
   formulaLabel: string | null;
   assumptions: Assumption[];
@@ -657,6 +664,24 @@ export const DEMO_GAPS: DemoGap[] = [
     ],
   },
 ];
+
+/**
+ * Whether a gap carries a monetary figure the caller can see.
+ *
+ * One predicate, because the check has three failure modes that all look alike
+ * at a call site: the value is null (no exposure), the field is absent
+ * (withheld), or the currency is missing (unusable). A component writing
+ * `=== null` catches only the first, which is exactly the bug this replaced.
+ */
+export function hasExposure(
+  gap: DemoGap,
+): gap is DemoGap & { exposureLow: number; exposureHigh: number; currency: string } {
+  return (
+    typeof gap.exposureLow === "number" &&
+    typeof gap.exposureHigh === "number" &&
+    typeof gap.currency === "string"
+  );
+}
 
 export const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
 

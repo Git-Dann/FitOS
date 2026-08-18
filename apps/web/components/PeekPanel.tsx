@@ -13,6 +13,7 @@
  * was produced*. A peek that showed only the headline would be a prettier
  * version of the thing this product exists to replace.
  */
+import { hasExposure } from "@/lib/demo-gaps";
 import type { DemoGap } from "@/lib/demo-gaps";
 import { ConfidenceMeter, ExposureBase, SeverityChip, StatusChip } from "./chips";
 import { age, count, dateTime, humanise, money, ratio } from "@/lib/format";
@@ -34,8 +35,9 @@ export function PeekPanel({
   onTransition: (request: TransitionRequest) => void;
   onClose: () => void;
 }) {
+  const showsExposure = hasExposure(gap);
   const basePosition =
-    gap.exposureLow !== null && gap.exposureHigh !== null && gap.exposureBase !== null
+    showsExposure && typeof gap.exposureBase === "number"
       ? gap.exposureHigh === gap.exposureLow
         ? 50
         : ((gap.exposureBase - gap.exposureLow) / (gap.exposureHigh - gap.exposureLow)) * 100
@@ -88,7 +90,7 @@ export function PeekPanel({
         </dl>
       </section>
 
-      {gap.exposureLow !== null && gap.currency ? (
+      {showsExposure ? (
         <section className="peek-section">
           <p className="peek-label">
             {gap.isModelled ? "▨ Modelled exposure" : "Observed exposure"}
@@ -102,7 +104,7 @@ export function PeekPanel({
               <span>
                 base <ExposureBase gap={gap} />
               </span>
-              <span>{money(gap.exposureHigh ?? 0, gap.currency)}</span>
+              <span>{money(gap.exposureHigh, gap.currency)}</span>
             </div>
           </div>
           <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center" }}>
@@ -127,9 +129,13 @@ export function PeekPanel({
       ) : (
         <section className="peek-section">
           <p className="peek-label">Exposure</p>
+          {/* Two different sentences. "This gap has no monetary figure" and
+              "you may not see this gap's figure" must never read alike — the
+              first is a fact about the finding, the second is a fact about you. */}
           <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-            This gap carries no monetary figure. A late or incomplete feed is not money, and
-            attaching a number to it would mean inventing one.
+            {gap.exposureLow === null
+              ? "This gap carries no monetary figure. A late or incomplete feed is not money, and attaching a number to it would mean inventing one."
+              : "Exposure is withheld from your payload. The figure exists; the fields were removed from the response before it was sent, so it never reached this page."}
           </p>
         </section>
       )}
