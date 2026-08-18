@@ -40,9 +40,10 @@ TABLE_GRANTS: dict[str, str] = {
     "memberships": "SELECT, INSERT, UPDATE, DELETE",
     "audit_events": "SELECT, INSERT",
     "gaps": "SELECT, INSERT, UPDATE",
+    "invitations": "SELECT, INSERT, UPDATE",
 }
 
-NO_DELETE_TABLES: tuple[str, ...] = ("audit_events", "gaps")
+NO_DELETE_TABLES: tuple[str, ...] = ("audit_events", "gaps", "invitations")
 
 ORG_SCOPED_TABLES: tuple[str, ...] = tuple(TABLE_GRANTS)
 
@@ -121,4 +122,55 @@ def all_statements(app_password: str) -> list[str]:
         f"GRANT SELECT, INSERT, UPDATE, DELETE ON organizations, users TO {APP_ROLE};",
         *grants_for(*ORG_SCOPED_TABLES),
         *enable_rls(*tables),
+        *user_organizations_statements(),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# The one deliberate hole in the wall, and why it is this shape
+# ---------------------------------------------------------------------------
+#
+# "Which organizations do I belong to" cannot be answered inside a tenant scope,
+# because the answer spans tenants. It is asked before an organization has been
+# chosen — it is the question whose answer lets you choose one.
+#
+# The tempting fix is to widen the memberships policy with
+# `OR user_id = current_setting('app.current_user_id')`. That is a bad trade:
+# every query against memberships would then also see the caller's rows in other
+# organizations, so an unrelated join could leak one without anybody writing a
+# cross-tenant query on purpose.
+#
+# Instead, one SECURITY DEFINER function, which:
+#
+#   - answers exactly this question and no other,
+#   - returns only the caller's own rows, never another user's,
+#   - returns organization identity and role only, no membership internals,
+#   - pins search_path, so the definer's rights cannot be turned against it by a
+#     shadowing object in a caller-controlled schema.
+#
+# The API calls it only with the verified `sub`. A caller cannot ask it about
+# somebody else, because there is no request field that reaches this argument.
+
+USER_ORGANIZATIONS_FUNCTION = """
+CREATE OR REPLACE FUNCTION user_organizations(p_user_id uuid)
+RETURNS TABLE (organization_id uuid, slug text, name text, role text)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT o.id, o.slug::text, o.name::text, m.role::text
+  FROM memberships m
+  JOIN organizations o ON o.id = m.organization_id
+  WHERE m.user_id = p_user_id
+  ORDER BY o.name;
+$$;
+"""
+
+
+def user_organizations_statements() -> list[str]:
+    return [
+        USER_ORGANIZATIONS_FUNCTION,
+        "REVOKE ALL ON FUNCTION user_organizations(uuid) FROM PUBLIC;",
+        f"GRANT EXECUTE ON FUNCTION user_organizations(uuid) TO {APP_ROLE};",
     ]

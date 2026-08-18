@@ -178,7 +178,7 @@ def test_a_tampered_payload_is_rejected(verifier: TokenVerifier, keypair: Any) -
         verifier.verify_with_key(f"{header}.{other}.{signature}", public)
 
 
-@pytest.mark.parametrize("missing", ["sub", "org"])
+@pytest.mark.parametrize("missing", ["sub"])
 def test_a_missing_identity_claim_is_a_refusal_not_a_default(
     verifier: TokenVerifier, keypair: Any, missing: str
 ) -> None:
@@ -200,6 +200,36 @@ def test_the_error_never_contains_the_token(verifier: TokenVerifier, keypair: An
 
 
 def test_a_malformed_organization_claim_is_refused(verifier: TokenVerifier, keypair: Any) -> None:
+    private, public = keypair
+    with pytest.raises(TokenError, match="malformed"):
+        verifier.verify_with_key(sign(private, claims(org="not-a-uuid")), public)
+
+
+def test_a_token_with_no_organization_is_identity_only_not_org_less_authority(
+    verifier: TokenVerifier, keypair: Any
+) -> None:
+    """`org` is optional here, and refused where it matters.
+
+    Two flows legitimately precede an organization: redeeming an invitation, and
+    asking which organizations you belong to. So the claim is optional at this
+    layer. The refusal lives in `authenticated_context`, which every org-scoped
+    route goes through — test_api_tenancy proves such a token gets 403 from one.
+    """
+    private, public = keypair
+    payload = claims()
+    del payload["org"]
+    token = verifier.verify_with_key(sign(private, payload), public)
+    assert token.organization_id is None
+
+
+def test_an_unreadable_organization_claim_does_not_become_no_organization(
+    verifier: TokenVerifier, keypair: Any
+) -> None:
+    """Present-but-malformed must not degrade into the identity-only path.
+
+    Falling back to None would silently route a broken token to the endpoints
+    that do not require an organization, which is a downgrade the caller chose.
+    """
     private, public = keypair
     with pytest.raises(TokenError, match="malformed"):
         verifier.verify_with_key(sign(private, claims(org="not-a-uuid")), public)

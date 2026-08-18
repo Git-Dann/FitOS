@@ -390,24 +390,96 @@ def test_a_refused_change_writes_no_audit_row(
 # --------------------------------------------------------------------------
 
 
-def test_every_org_scoped_route_is_covered_by_a_cross_tenant_test(client: TestClient) -> None:
-    """Fails when an org-scoped route ships without a cross-tenant test.
+def _all_api_routes(app: Any) -> list[Any]:
+    """Flatten the route tree.
+
+    `app.routes` is not the list of routes. FastAPI keeps each included router
+    as one opaque `_IncludedRouter` entry whose real routes hang off
+    `original_router`, so walking only the top level sees the two health
+    endpoints and nothing else. The first version of this guard did exactly
+    that: it reported full coverage of a set it could not see, and every
+    org-scoped route added since had been silently exempt.
+
+    That is why the flattening is a named helper with its own test rather than
+    a comprehension inline — a coverage check that sees nothing passes
+    everything, and looks identical to one that works.
+
+    This assumes routers are included without an extra prefix, which is true
+    here: each router carries its own. `test_the_route_walker_actually_finds_the_routes`
+    fails if that stops holding.
+    """
+    found: list[Any] = []
+    stack = list(app.routes)
+    while stack:
+        route = stack.pop()
+        if hasattr(route, "dependant"):
+            found.append(route)
+        stack.extend(getattr(route, "routes", []))
+        included = getattr(route, "original_router", None)
+        if included is not None:
+            stack.extend(included.routes)
+    return found
+
+
+def test_the_route_walker_actually_finds_the_routes(client: TestClient) -> None:
+    """Guards the guard. A coverage check that sees nothing passes everything."""
+    paths = {r.path for r in _all_api_routes(client.app)}
+    # Every path the app documents, minus the ones with no dependencies to walk.
+    app: Any = client.app
+    documented = set(app.openapi()["paths"]) - {"/health", "/ready"}
+    missing = documented - paths
+    assert not missing, f"the walker cannot see these routes: {sorted(missing)}"
+    assert "/v1/memberships" in paths
+    assert "/v1/invitations/accept" in paths
+
+
+def test_every_route_that_touches_tenant_data_is_covered_by_a_cross_tenant_test(
+    client: TestClient,
+) -> None:
+    """Fails when a data-touching route ships without a cross-tenant test.
 
     CLAUDE.md requires the negative test in the same commit as the endpoint.
-    This is what makes that rule enforceable rather than aspirational: it lists
-    the routes that depend on a tenant-scoped session and checks each appears in
-    the covered set below.
+    This is what makes that rule enforceable rather than aspirational.
+
+    Both session dependencies count. `scoped_session` routes need the usual
+    404-not-403 pair. `unscoped_session` routes need more thought, not less:
+    they run without a tenant context by design, so each one has to earn its
+    place here individually.
     """
-    covered = {"/v1/memberships", "/v1/memberships/{membership_id}"}
+    covered_scoped = {
+        "/v1/memberships",
+        "/v1/memberships/{membership_id}",
+        "/v1/invitations",
+        "/v1/invitations/{invitation_id}/revoke",
+    }
+    # Routes that deliberately run without a tenant scope, and where the
+    # cross-tenant reasoning lives.
+    covered_unscoped = {
+        # test_invitations.py: every failure mode returns one indistinguishable
+        # 404, and the scope is opened from the code before anything is read.
+        "/v1/invitations/accept",
+        # test_auth_routes.py: goes through user_organizations(), which returns
+        # only the caller's own rows.
+        "/v1/auth/organizations",
+    }
 
-    org_scoped: set[str] = set()
-    for route in client.app.routes:  # type: ignore[attr-defined]
-        dependant = getattr(route, "dependant", None)
-        if dependant is None:
-            continue
-        names = {d.call.__name__ for d in dependant.dependencies if d.call is not None}
+    scoped: set[str] = set()
+    unscoped: set[str] = set()
+    for route in _all_api_routes(client.app):
+        names = {d.call.__name__ for d in route.dependant.dependencies if d.call is not None}
         if "scoped_session" in names:
-            org_scoped.add(route.path)
+            scoped.add(route.path)
+        if "unscoped_session" in names:
+            unscoped.add(route.path)
 
-    missing = org_scoped - covered
-    assert not missing, f"org-scoped routes without a cross-tenant test: {sorted(missing)}"
+    assert not scoped - covered_scoped, (
+        f"org-scoped routes without a cross-tenant test: {sorted(scoped - covered_scoped)}"
+    )
+    assert not unscoped - covered_unscoped, (
+        "routes running without a tenant scope and without a recorded reason: "
+        f"{sorted(unscoped - covered_unscoped)}"
+    )
+    # And the lists must not rot: an entry naming a route that no longer exists
+    # hides the next one that goes missing.
+    assert not covered_scoped - scoped, f"stale entries: {sorted(covered_scoped - scoped)}"
+    assert not covered_unscoped - unscoped, f"stale entries: {sorted(covered_unscoped - unscoped)}"

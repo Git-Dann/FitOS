@@ -123,12 +123,13 @@ def test_the_migrated_schema_enforces_rls(migrated_database: str) -> None:
         rows = conn.execute(
             text(
                 "SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class "
-                "WHERE relname IN ('organizations','memberships','audit_events','gaps')"
+                "WHERE relname IN "
+                "('organizations','memberships','audit_events','gaps','invitations')"
             )
         ).all()
     engine.dispose()
 
-    assert len(rows) == 4
+    assert len(rows) == 5
     for name, enabled, forced in rows:
         assert enabled, f"{name} has no RLS after migration"
         assert forced, f"{name} does not FORCE RLS after migration"
@@ -184,3 +185,47 @@ def test_downgrade_is_refused_because_it_would_destroy_the_audit_trail() -> None
 
     with pytest.raises(NotImplementedError, match="audit trail"):
         module.downgrade()
+
+
+def test_the_migration_creates_the_cross_tenant_function_with_a_pinned_search_path(
+    migrated_database: str,
+) -> None:
+    """SECURITY DEFINER without a pinned search_path is a privilege-escalation bug.
+
+    The function runs as its owner, which is the role that owns the schema. If
+    an attacker can get an object of theirs resolved ahead of `public`, the body
+    executes their code with the owner's rights. `SET search_path` in the
+    definition is what closes that, so it is asserted here rather than assumed
+    from having written it once.
+    """
+    engine = create_engine(migrated_database)
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT prosecdef, proconfig FROM pg_proc WHERE proname = 'user_organizations'")
+        ).one()
+    engine.dispose()
+
+    security_definer, config = row
+    assert security_definer, "user_organizations must be SECURITY DEFINER to answer across tenants"
+    assert config is not None, "SECURITY DEFINER function with no pinned search_path"
+    assert any(c.startswith("search_path=") for c in config), config
+
+
+def test_the_cross_tenant_function_is_not_executable_by_everyone(
+    migrated_database: str,
+) -> None:
+    """PUBLIC EXECUTE is the default on a new function and must be revoked."""
+    engine = create_engine(migrated_database)
+    with engine.connect() as conn:
+        public_can_execute = conn.execute(
+            text("SELECT has_function_privilege('public', 'user_organizations(uuid)', 'EXECUTE')")
+        ).scalar_one()
+        app_can_execute = conn.execute(
+            text(
+                "SELECT has_function_privilege('fitos_app', 'user_organizations(uuid)', 'EXECUTE')"
+            )
+        ).scalar_one()
+    engine.dispose()
+
+    assert not public_can_execute, "PUBLIC can execute the cross-tenant function"
+    assert app_can_execute, "the application role cannot execute it, so the switcher is broken"

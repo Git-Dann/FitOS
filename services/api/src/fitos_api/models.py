@@ -116,6 +116,82 @@ class Membership(Base):
     )
 
 
+class Invitation(Base):
+    """An offer of membership, redeemable once.
+
+    The invitation code is a credential, so the code itself is never stored —
+    only `code_hash`, a SHA-256 of the secret half (CLAUDE.md: no secrets in
+    application tables). A leaked database backup therefore yields no usable
+    invitation. The code is shown exactly once, in the response to the request
+    that created it, and cannot be retrieved afterwards.
+
+    The code the recipient receives is `<organization_id>.<secret>`. The
+    organization half is not authority — it is there so the API can open the
+    tenant scope *before* looking the invitation up, which keeps redemption
+    inside RLS instead of needing an exemption to find the row. The secret half
+    is what actually proves anything.
+
+    Status is a column rather than a computed property because expiry and
+    revocation must be visible to a query and to the audit trail, not inferred
+    at read time by whichever caller happens to look.
+    """
+
+    __tablename__ = "invitations"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    granted_capabilities: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
+    invited_by_membership_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    accepted_user_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'accepted', 'revoked', 'expired')",
+            name="ck_invitation_status",
+        ),
+        CheckConstraint(
+            "role IN ('frontline', 'manager', 'analyst', 'admin', 'owner', 'presenter-demo')",
+            name="ck_invitation_role",
+        ),
+        # An accepted invitation names who accepted it and when; an unaccepted
+        # one names neither. Half-recorded acceptance is not a state the audit
+        # trail should be able to reach.
+        CheckConstraint(
+            "(status = 'accepted') = (accepted_at IS NOT NULL AND accepted_user_id IS NOT NULL)",
+            name="ck_invitation_accepted",
+        ),
+        CheckConstraint(
+            "(status = 'revoked') = (revoked_at IS NOT NULL)", name="ck_invitation_revoked"
+        ),
+        CheckConstraint("expires_at > created_at", name="ck_invitation_expiry_future"),
+        CheckConstraint("code_hash ~ '^[0-9a-f]{64}$'", name="ck_invitation_code_hash_is_a_hash"),
+        # One live invitation per address per organization. Partial, so a
+        # revoked or expired invitation does not block re-inviting someone.
+        Index(
+            "uq_invitation_pending_email",
+            "organization_id",
+            "email",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index("ix_invitations_code_hash", "code_hash"),
+    )
+
+
 class AuditEvent(Base):
     """Append-only.
 

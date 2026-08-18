@@ -51,10 +51,15 @@ class VerifiedToken:
     `organization_id` is the organization the caller *asked* to act in. It is
     not authority to act there — `authenticated_context` still has to find a
     membership under RLS.
+
+    It is optional because two flows legitimately have no organization yet:
+    accepting an invitation, and asking which organizations you belong to. Every
+    org-scoped route goes through `authenticated_context`, which refuses a token
+    without one, so "optional" never means "defaulted".
     """
 
     user_id: UUID
-    organization_id: UUID
+    organization_id: UUID | None
 
 
 @dataclass(frozen=True)
@@ -106,10 +111,20 @@ def token_from_claims(payload: dict[str, Any]) -> VerifiedToken:
     """
     try:
         user_id = UUID(str(payload["sub"]))
-        organization_id = UUID(str(payload["org"]))
     except KeyError as exc:
         raise TokenError(f"token missing required claim: {exc.args[0]}") from exc
     except ValueError as exc:
         raise TokenError(f"token claim malformed: {exc}") from exc
+
+    raw_org = payload.get("org")
+    organization_id: UUID | None = None
+    if raw_org is not None:
+        try:
+            organization_id = UUID(str(raw_org))
+        except ValueError as exc:
+            # Present but unreadable is a refusal, not a fallback to None. A
+            # malformed organization must not become "no organization", which
+            # would quietly route the caller to the identity-only endpoints.
+            raise TokenError(f"token claim malformed: {exc}") from exc
 
     return VerifiedToken(user_id=user_id, organization_id=organization_id)

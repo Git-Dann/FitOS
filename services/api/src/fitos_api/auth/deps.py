@@ -27,6 +27,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -98,6 +99,14 @@ def authenticated_context(
     none means the caller is not a member of it. No membership, no principal,
     no handler.
     """
+    if token.organization_id is None:
+        # An identity-only token reaching an org-scoped route. There is nothing
+        # to default to: picking "their only organization" would silently make
+        # the single-org case work and the multi-org case a surprise.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="token names no organization",
+        )
     factory = request.app.state.session_factory
     with factory() as session:
         with organization_scope(session, token.organization_id):
@@ -113,13 +122,16 @@ def authenticated_context(
                     detail="not a member of the requested organization",
                 )
             yield RequestContext(
-                principal=_principal_from(token, membership),
+                # The organization is passed explicitly rather than re-read off
+                # the token: it is non-optional from here on, and saying so
+                # keeps the narrowing above from being undone by a later edit.
+                principal=_principal_from(token.user_id, token.organization_id, membership),
                 session=session,
             )
         session.commit()
 
 
-def _principal_from(token: VerifiedToken, membership: Membership) -> Principal:
+def _principal_from(user_id: UUID, organization_id: UUID, membership: Membership) -> Principal:
     try:
         role = Role(membership.role)
     except ValueError as exc:
@@ -140,8 +152,8 @@ def _principal_from(token: VerifiedToken, membership: Membership) -> Principal:
         ) from exc
 
     return Principal(
-        user_id=token.user_id,
-        organization_id=token.organization_id,
+        user_id=user_id,
+        organization_id=organization_id,
         membership_id=membership.id,
         role=role,
         granted=granted,
@@ -184,3 +196,17 @@ def scoped_session(
     rather than open.
     """
     return context.session
+
+
+def unscoped_session(request: Request) -> Iterator[Session]:
+    """A session with no tenant context, for the two flows that precede one.
+
+    Used only by invitation redemption and organization listing. Because the
+    policies deny when `app.current_organization_id` is unset, a session from
+    here sees nothing until the handler opens a scope deliberately — the failure
+    mode of forgetting is an empty result, not a cross-tenant one.
+    """
+    factory = request.app.state.session_factory
+    with factory() as session:
+        yield session
+        session.commit()
