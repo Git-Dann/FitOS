@@ -319,35 +319,49 @@ detector's first dependency.
 
 ```text
 Read @docs/master-build-brief.md, @docs/build-state.md, @docs/implementation-plan.md,
-@CLAUDE.md, @docs/data-contracts.md, @docs/gap-model.md and @docs/adr/0004-semantic-layer.md.
+@CLAUDE.md, @docs/design-system.md, @docs/design-concepts.md and @docs/gap-model.md.
 Start in Plan Mode.
 
-Bring the stack up first: `pnpm dev:infra` (start dockerd if it is not running — it is installed),
-then `pnpm canonical:apply` and `pnpm dbt:build`. Confirm CI is green on the branch.
+Bring the stack up first: `pnpm dev:infra` (start dockerd if it is not running — it is installed).
+Export FITOS_TEST_DATABASE_URL as a psycopg 3 URL —
+`postgresql+psycopg://fitos:fitos_local_only@127.0.0.1:5432/postgres` — plus FITOS_REQUIRE_DB_TESTS=1,
+FITOS_APP_ROLE_PASSWORD and FITOS_AUTH_ROLE_PASSWORD, or 151 tests skip and read as passing.
+Confirm CI is green on the branch.
 
-Then implement Phase D: governed metric definitions as code; Cube models and tenant policies; the
-detector framework with versioned config, typed I/O, replay and fixtures; the twelve detector
-classes starting with source mismatch and ratio threshold; exposure and confidence models; gap
-lifecycle with permissioned transitions; evidence lineage; dedupe and correlation; actions and
-outcomes.
+Then implement Phase E: the design-system tokens and primitives; the app shell (Concept A); the gap
+inbox with virtualisation, peek and bulk actions; gap detail (Concept C); metrics and sources
+routes; the frontline, manager (Concept B heat grid), analyst and admin routes; every state; and
+Storybook.
 
-The acceptance criteria are the gate, and the first one is the hardest: a certified metric must
-return the same value through Cube, the API and a dbt test — one definition, three consumers. Build
-the definition as the single source and generate the others from it, because three hand-written
-copies agree right up until they do not.
+Phase D left the data behind all of this real: nine detector classes, the gap lifecycle with
+permissioned transitions, actions and outcomes, and an API that already withholds exposure from a
+frontline token server-side. Do not re-implement any of that in the client. In particular, exposure
+is absent from the payload rather than masked — a UI that hides a number it received is not the
+same control, and `test_gap_lifecycle.py` asserts the difference.
 
-Hold the rules in CLAUDE.md that Phase D is most likely to break: no gap without a metric version,
-a detector version, evidence and an as-of time; no modelled money without low, base, high,
-assumptions and confidence; no analytical value or formula in a React component; and no causal
+The rules Phase E is most likely to break, all from CLAUDE.md: no analytical value, formula or
+currency literal in a React component; no placeholder buttons on a route marked complete; a
+connector card shows its real state and `fixture` is never dressed as `healthy`; and no causal
 language on anything that is not a controlled_test outcome.
 
-Every guard gets a test that it fails. Phase B shipped a coverage guard that checked nothing for a
-whole phase, and Phase C shipped a tenant check that fired on correct code — both are recorded in
-build-state as the reason for the rule.
+Before marking any route complete: capture screenshots at 1440 x 900, 1024 x 768 and 390 x 844, have
+the design-reviewer subagent compare them against docs/design-system.md, and fix the findings. Test
+empty, loading, delayed, partial, error, unauthorised and offline-recovery states — a passing happy
+path is not completion.
 
-Two items in the Phase C threat-model review are blocking prerequisites rather than backlog: C1
+Every guard gets a test that it fails. Phase B shipped a coverage guard that checked nothing for a
+whole phase; Phase C shipped a tenant check that fired on correct code; Phase D shipped a golden
+test that rewrote its own expectations for three rounds. All three are recorded above as the reason
+for the rule.
+
+Two items in the Phase C threat-model review remain blocking prerequisites rather than backlog: C1
 (upload hardening) blocks any XLSX parsing or upload-download endpoint, and C2 (the deserialisation
 lint rule) should land next. Do not add either capability without its control.
+
+Optional, and smaller than it looks: three of the brief's twelve detector classes are outstanding
+(identity match, trend break, staffing ratio), but every family in the product-spec table already
+has a class behind it. Adding one is a config plus a `detect` method; the golden-fixture coverage
+test will fail until it has a fixture.
 
 Run pnpm verify, update docs/build-state.md, commit the coherent outcome and print the exact prompt
 for the next fresh session.
