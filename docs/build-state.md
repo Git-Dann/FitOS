@@ -200,7 +200,7 @@ here gets a test that it fails when it should.
 | 5 | Cube × ClickHouse × dbt-clickhouse compatibility | Pinned, untested until risk 1 closes. |
 | 6 | Better Auth is young for a security-critical position | **Reduced, not closed.** The boundary is now real: it issues and stores identity, and holds no authorisation state. A compromise still forges identity, but not authority — the membership row decides that. |
 | 7 | CI has never executed | **Closed** in Phase A. Runs 1 and 2 recorded below. |
-| 8 | The `identity` CI job has never run | **Open.** Added this session; the JWKS contract passes locally but the job itself is unexecuted. Same class of risk as 7 was. |
+| 8 | The `identity` CI job has never run | **Closed.** Executed on `0c3eb9d` and passed in 51s. See [CI run 3](#ci-run-3). |
 
 ## footprint
 
@@ -254,9 +254,8 @@ intended value is visible rather than silent.
 **Phase C — data plane.** Acceptance criteria in
 [implementation-plan.md](implementation-plan.md#phase-c--data-plane).
 
-The infrastructure blocker is gone: ClickHouse, MinIO, Temporal and Cube are running and answering.
-Risk 8 remains — the `identity` CI job has still never executed — and should be confirmed on the
-first push of the next session rather than deferred again.
+No blockers. ClickHouse, MinIO, Temporal and Cube are running and answering, and CI is green on the
+branch including the new `identity` job. Phase C can start on code rather than on environment.
 
 ## next_session_prompt
 
@@ -265,9 +264,8 @@ Read @docs/master-build-brief.md, @docs/build-state.md, @docs/implementation-pla
 @CLAUDE.md, @docs/connector-sdk.md, @docs/data-contracts.md and @docs/adr/0002-analytics-store.md.
 Start in Plan Mode.
 
-Compose is verified and the footprint is recorded, so start by running `pnpm dev:infra` and
-confirming 7/7 healthy — if `dockerd` is not running, start it; it is installed. Then confirm
-CI is green on the branch, including the `identity` job, which has still never executed.
+Start by running `pnpm dev:infra` and confirming 7/7 healthy — if `dockerd` is not running,
+start it; it is installed and simply not started by default in some environments.
 
 Then implement Phase C: raw object storage with immutability; the connector SDK; CSV/XLSX
 upload and generic REST connectors; Temporal workflows for runs, backfills and retries; the
@@ -336,6 +334,28 @@ pnpm, so setup-node failed before any step ran. Fixed with `package-manager-cach
 
 Worth noting because it will recur: a job whose package manager differs from the repository default
 needs that input set explicitly under setup-node v5.
+
+## CI run 3
+
+On `0c3eb9d`, after the production build failure on `2c84455` was fixed. **All six jobs passed**,
+visual regression skipped as designed.
+
+| Job | Result |
+| --- | --- |
+| JS — format, lint, typecheck, unit | pass |
+| Python — lint, typecheck, unit | pass |
+| **JWKS contract (Node issues, Python verifies)** | **pass**, 51s — its first execution |
+| Production build | pass |
+| Dependency audit and secret scan | pass, gitleaks clean |
+| Legacy prototype | pass |
+| Visual regression | skipped, as designed |
+
+The failure it followed is worth recording, because the fix was not to relax the check. Next
+collects page data at build time by importing every route module, so constructing Better Auth at
+import made `pnpm build` demand `BETTER_AUTH_SECRET` and a database URL. `required()` still throws
+and still has no default; what moved is *when* it runs. A build machine has no business holding the
+signing secret, and a pipeline that needs one in order to compile is a pipeline someone has to be
+given one for.
 
 ## session history
 
