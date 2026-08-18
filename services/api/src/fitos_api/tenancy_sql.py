@@ -30,6 +30,10 @@ from __future__ import annotations
 import re
 
 APP_ROLE = "fitos_app"
+# Better Auth's role. Separate from the application role because it needs the
+# tables the application role must never see: password hashes, refresh tokens
+# and the private JWT signing keys (migration 0004).
+AUTH_ROLE = "fitos_auth"
 
 # Tables carrying organization_id, with the privileges the application role gets.
 #
@@ -71,7 +75,27 @@ def create_roles(app_password: str) -> list[str]:
         "NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS; "
         "END IF; END $$;"
     )
-    return [f"GRANT USAGE ON SCHEMA public TO {APP_ROLE};", create_role]
+    # Create first, then grant. The other order only appears to work against a
+    # cluster where the role already exists — which is every cluster a migration
+    # has ever been run against twice, and no cluster on its first deploy.
+    return [create_role, f"GRANT USAGE ON SCHEMA public TO {APP_ROLE};"]
+
+
+def create_auth_role(password: str) -> list[str]:
+    """Create the identity role. Same validation reasoning as `create_roles`."""
+    if not password or not _PASSWORD_PATTERN.fullmatch(password):
+        raise ValueError(
+            "identity role password must be 8-128 chars of [A-Za-z0-9_.-]; "
+            "it is interpolated into DDL and must not be able to escape the literal"
+        )
+    create_role = (
+        "DO $$ BEGIN "  # noqa: S608
+        f"IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{AUTH_ROLE}') THEN "
+        f"CREATE ROLE {AUTH_ROLE} LOGIN PASSWORD '{password}' "
+        "NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS; "
+        "END IF; END $$;"
+    )
+    return [create_role, f"GRANT USAGE ON SCHEMA public TO {AUTH_ROLE};"]
 
 
 def grants_for(*tables: str) -> list[str]:

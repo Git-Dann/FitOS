@@ -9,6 +9,7 @@ been seen to refuse anything is a guard nobody has tested.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import textwrap
@@ -43,6 +44,45 @@ class TestDemoAuthProductionGuard:
     def test_the_default_is_off(self) -> None:
         """A forgotten setting must default to the safe value."""
         assert Settings().demo_auth_enabled is False
+
+    def test_the_process_refuses_to_start_not_just_the_model_to_construct(self) -> None:
+        """The acceptance check is about *startup*, so test startup.
+
+        `Settings()` raising is necessary but not sufficient: what matters is
+        that importing the ASGI app fails, so a misconfigured deployment has no
+        process to route traffic to. This runs a real interpreter with the
+        production environment set, because an in-process test could pass while
+        the module-level `app = bootstrap()` had been made lazy or wrapped in a
+        try/except by some later change.
+        """
+        result = subprocess.run(
+            [sys.executable, "-c", "import fitos_api.main"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env={
+                **os.environ,
+                "FITOS_ENVIRONMENT": "production",
+                "FITOS_DEMO_AUTH_ENABLED": "true",
+            },
+        )
+        assert result.returncode != 0, "the app started with demo auth enabled in production"
+        assert "must not be true" in result.stderr
+
+    def test_the_same_process_starts_when_demo_auth_is_off(self) -> None:
+        """Otherwise the test above could be passing for an unrelated reason."""
+        result = subprocess.run(
+            [sys.executable, "-c", "import fitos_api.main"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env={
+                **os.environ,
+                "FITOS_ENVIRONMENT": "production",
+                "FITOS_DEMO_AUTH_ENABLED": "false",
+            },
+        )
+        assert result.returncode == 0, result.stderr
 
 
 class TestRoleComparisonChecker:

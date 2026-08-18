@@ -28,6 +28,7 @@ pytestmark = requires_db
 
 API_ROOT = Path(__file__).resolve().parents[1]
 APP_PASSWORD = "migration_test_only"
+AUTH_PASSWORD = "migration_test_only"
 
 
 @pytest.fixture
@@ -47,6 +48,7 @@ def migrated_database() -> Iterator[str]:
             **os.environ,
             "FITOS_MIGRATION_DATABASE_URL": url,
             "FITOS_APP_ROLE_PASSWORD": APP_PASSWORD,
+            "FITOS_AUTH_ROLE_PASSWORD": AUTH_PASSWORD,
         },
         capture_output=True,
         text=True,
@@ -162,7 +164,12 @@ def test_the_migration_refuses_to_run_without_an_app_role_password() -> None:
         env={
             k: v
             for k, v in os.environ.items()
-            if k not in {"FITOS_APP_ROLE_PASSWORD", "FITOS_MIGRATION_DATABASE_URL"}
+            if k
+            not in {
+                "FITOS_APP_ROLE_PASSWORD",
+                "FITOS_AUTH_ROLE_PASSWORD",
+                "FITOS_MIGRATION_DATABASE_URL",
+            }
         }
         | {"FITOS_MIGRATION_DATABASE_URL": ADMIN_URL or ""},
         capture_output=True,
@@ -229,3 +236,80 @@ def test_the_cross_tenant_function_is_not_executable_by_everyone(
 
     assert not public_can_execute, "PUBLIC can execute the cross-tenant function"
     assert app_can_execute, "the application role cannot execute it, so the switcher is broken"
+
+
+def test_the_application_role_cannot_read_the_signing_keys(migrated_database: str) -> None:
+    """RELEASE GATE. An injection in the API must not reach the private keys.
+
+    `jwks` holds the private halves of the JWT signing keys and `accounts` holds
+    password hashes and OAuth refresh tokens. Every API request runs as
+    `fitos_app`. If that role can select from either table, the blast radius of
+    any SQL injection in the API includes minting tokens for anyone.
+    """
+    engine = create_engine(migrated_database)
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT table_name, privilege_type FROM information_schema.role_table_grants "
+                "WHERE grantee = 'fitos_app' "
+                "AND table_name IN ('jwks','accounts','sessions','verifications')"
+            )
+        ).all()
+    engine.dispose()
+
+    assert rows == [], f"the application role can reach identity tables: {rows}"
+
+
+def test_the_identity_role_can_do_its_job(migrated_database: str) -> None:
+    """The counterpart. Revoking too much is also a bug, just a louder one."""
+    engine = create_engine(migrated_database)
+    with engine.connect() as conn:
+        granted = {
+            (r[0], r[1])
+            for r in conn.execute(
+                text(
+                    "SELECT table_name, privilege_type FROM information_schema.role_table_grants "
+                    "WHERE grantee = 'fitos_auth'"
+                )
+            ).all()
+        }
+    engine.dispose()
+
+    for table in ("jwks", "accounts", "sessions", "verifications", "users"):
+        assert (table, "SELECT") in granted, f"the identity role cannot read {table}"
+        assert (table, "INSERT") in granted, f"the identity role cannot write {table}"
+
+
+def test_the_migration_refuses_to_run_without_an_identity_role_password() -> None:
+    """Same reasoning as the application role: no default becomes a production one."""
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=API_ROOT,
+        env={k: v for k, v in os.environ.items() if k != "FITOS_AUTH_ROLE_PASSWORD"}
+        | {
+            "FITOS_MIGRATION_DATABASE_URL": ADMIN_URL or "",
+            "FITOS_APP_ROLE_PASSWORD": APP_PASSWORD,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "FITOS_AUTH_ROLE_PASSWORD" in result.stderr
+
+
+def test_a_role_is_created_before_it_is_granted_anything() -> None:
+    """Statement order, because the wrong order only fails on a fresh cluster.
+
+    `GRANT USAGE ... TO fitos_app` before `CREATE ROLE fitos_app` succeeds on
+    every cluster where the role already exists — which is every cluster a
+    migration has run against twice, and no cluster on its first deploy. It was
+    written that way and passed for exactly that reason, until migration 0004
+    added a second role and the first real run failed.
+    """
+    from fitos_api.tenancy_sql import create_auth_role, create_roles
+
+    for statements in (create_roles("valid_password"), create_auth_role("valid_password")):
+        create_index = next(i for i, s in enumerate(statements) if "CREATE ROLE" in s)
+        grant_index = next(i for i, s in enumerate(statements) if "GRANT USAGE" in s)
+        assert create_index < grant_index, statements
