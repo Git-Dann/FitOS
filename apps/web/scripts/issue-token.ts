@@ -12,11 +12,12 @@
  * Called by services/api/tests/test_jwks_contract.py. Not part of the running
  * application, and not reachable from it.
  */
-import { auth } from "../lib/auth";
+import { getAuth } from "../lib/auth";
 
 async function main(): Promise<void> {
   const email = `contract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 
+  const auth = getAuth();
   const signUp = await auth.api.signUpEmail({
     body: { email, password: "correct-horse-battery-staple", name: "Contract Probe" },
     returnHeaders: true,

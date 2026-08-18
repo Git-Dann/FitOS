@@ -16,6 +16,14 @@
  * - `expirationTime` is short. It is no longer a security boundary — authority
  *   is re-read per request — but it still bounds how long a stolen token is
  *   useful for proving identity.
+ *
+ * The instance is built on first use rather than at import. `required()` still
+ * throws, and still has no default — what changes is *when*. Next collects page
+ * data at build time by importing every route module, so constructing at import
+ * meant `pnpm build` demanded the production secret and the database URL. A
+ * build machine has no business holding either: building is not running, and a
+ * pipeline that needs the signing secret to compile is a pipeline that has to
+ * be given one.
  */
 import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
@@ -36,101 +44,112 @@ function required(name: string): string {
 export const ISSUER = process.env.FITOS_AUTH_ISSUER ?? "http://localhost:3000";
 export const AUDIENCE = process.env.FITOS_AUTH_AUDIENCE ?? "fitos-api";
 
-export const auth = betterAuth({
-  baseURL: ISSUER,
-  secret: required("BETTER_AUTH_SECRET"),
-  database: new Pool({ connectionString: required("FITOS_AUTH_DATABASE_URL") }),
+type Auth = ReturnType<typeof createAuth>;
 
-  emailAndPassword: { enabled: true },
+let instance: Auth | undefined;
 
-  user: {
-    // The identity mirror the API already owns. See migration 0001.
-    modelName: "users",
-    fields: {
-      name: "display_name",
-      emailVerified: "email_verified",
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-    },
-  },
-  // Every field is mapped, not just the ones that collide. Better Auth defaults
-  // to camelCase column names; leaving them would put quoted identifiers like
-  // "expiresAt" next to snake_case everywhere else, and a schema you have to
-  // quote is a schema people get wrong.
-  session: {
-    modelName: "sessions",
-    fields: {
-      userId: "user_id",
-      expiresAt: "expires_at",
-      ipAddress: "ip_address",
-      userAgent: "user_agent",
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-    },
-  },
-  account: {
-    modelName: "accounts",
-    fields: {
-      userId: "user_id",
-      accountId: "account_id",
-      providerId: "provider_id",
-      accessToken: "access_token",
-      refreshToken: "refresh_token",
-      idToken: "id_token",
-      accessTokenExpiresAt: "access_token_expires_at",
-      refreshTokenExpiresAt: "refresh_token_expires_at",
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-    },
-  },
-  verification: {
-    modelName: "verifications",
-    fields: {
-      expiresAt: "expires_at",
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-    },
-  },
+/** The single instance, built on first request. */
+export function getAuth(): Auth {
+  return (instance ??= createAuth());
+}
 
-  advanced: {
-    database: {
-      // UUIDs, because every other id in this system is one and
-      // memberships.user_id is typed uuid.
-      generateId: () => crypto.randomUUID(),
-    },
-  },
+function createAuth() {
+  return betterAuth({
+    baseURL: ISSUER,
+    secret: required("BETTER_AUTH_SECRET"),
+    database: new Pool({ connectionString: required("FITOS_AUTH_DATABASE_URL") }),
 
-  plugins: [
-    jwt({
-      schema: {
-        jwks: {
-          modelName: "jwks",
-          fields: {
-            publicKey: "public_key",
-            privateKey: "private_key",
-            createdAt: "created_at",
-            expiresAt: "expires_at",
+    emailAndPassword: { enabled: true },
+
+    user: {
+      // The identity mirror the API already owns. See migration 0001.
+      modelName: "users",
+      fields: {
+        name: "display_name",
+        emailVerified: "email_verified",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+    },
+    // Every field is mapped, not just the ones that collide. Better Auth defaults
+    // to camelCase column names; leaving them would put quoted identifiers like
+    // "expiresAt" next to snake_case everywhere else, and a schema you have to
+    // quote is a schema people get wrong.
+    session: {
+      modelName: "sessions",
+      fields: {
+        userId: "user_id",
+        expiresAt: "expires_at",
+        ipAddress: "ip_address",
+        userAgent: "user_agent",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+    },
+    account: {
+      modelName: "accounts",
+      fields: {
+        userId: "user_id",
+        accountId: "account_id",
+        providerId: "provider_id",
+        accessToken: "access_token",
+        refreshToken: "refresh_token",
+        idToken: "id_token",
+        accessTokenExpiresAt: "access_token_expires_at",
+        refreshTokenExpiresAt: "refresh_token_expires_at",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+    },
+    verification: {
+      modelName: "verifications",
+      fields: {
+        expiresAt: "expires_at",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+    },
+
+    advanced: {
+      database: {
+        // UUIDs, because every other id in this system is one and
+        // memberships.user_id is typed uuid.
+        generateId: () => crypto.randomUUID(),
+      },
+    },
+
+    plugins: [
+      jwt({
+        schema: {
+          jwks: {
+            modelName: "jwks",
+            fields: {
+              publicKey: "public_key",
+              privateKey: "private_key",
+              createdAt: "created_at",
+              expiresAt: "expires_at",
+            },
           },
         },
-      },
-      jwks: {
-        // EdDSA/Ed25519 is Better Auth's default and is on the API's
-        // allowlist. HS* is not, and cannot be: the JWKS is public, so a
-        // symmetric algorithm would let anyone who can read it mint tokens.
-        keyPairConfig: { alg: "EdDSA", crv: "Ed25519" },
-      },
-      jwt: {
-        issuer: ISSUER,
-        audience: AUDIENCE,
-        expirationTime: "15m",
-        definePayload: ({ user }) => ({
-          // `org` is the organization the caller is asking to act in. It is a
-          // request, not a grant — the API still has to find a membership for
-          // this user inside it (ADR 0009). Deliberately no role and no
-          // capabilities: there is nowhere for them to land on the other side.
-          org: (user as { activeOrganizationId?: string }).activeOrganizationId,
-        }),
-      },
-    }),
-  ],
-});
+        jwks: {
+          // EdDSA/Ed25519 is Better Auth's default and is on the API's
+          // allowlist. HS* is not, and cannot be: the JWKS is public, so a
+          // symmetric algorithm would let anyone who can read it mint tokens.
+          keyPairConfig: { alg: "EdDSA", crv: "Ed25519" },
+        },
+        jwt: {
+          issuer: ISSUER,
+          audience: AUDIENCE,
+          expirationTime: "15m",
+          definePayload: ({ user }) => ({
+            // `org` is the organization the caller is asking to act in. It is a
+            // request, not a grant — the API still has to find a membership for
+            // this user inside it (ADR 0009). Deliberately no role and no
+            // capabilities: there is nowhere for them to land on the other side.
+            org: (user as { activeOrganizationId?: string }).activeOrganizationId,
+          }),
+        },
+      }),
+    ],
+  });
+}
