@@ -1,0 +1,7 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+# legacy/fitos-prototype is deliberately excluded from the workspace.
+# It keeps its own package-lock.json so its Cloudflare toolchain — and the
+# 16 high-severity advisories that come with it — stay out of the platform
+# dependency graph. See docs/adr/0008-hosting-target-and-legacy-runtime.md.

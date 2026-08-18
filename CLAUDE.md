@@ -7,28 +7,38 @@ before starting a phase. Read only the ADRs and code that phase needs.
 
 ## Current state
 
-The monorepo does not exist yet. As of Session 1 this is still the single-package prototype, and
-only the commands in the "today" table below work. Do not assume a command exists because this file
-or a spec document mentions it.
+Phase A is complete: the pnpm + Turborepo monorepo and the `uv` Python workspace exist, and
+`pnpm verify` passes. Product code does not exist yet — the phase plan is in
+[docs/implementation-plan.md](docs/implementation-plan.md), live status in
+[docs/build-state.md](docs/build-state.md).
+
+Do not assume a command works because this file or a spec document mentions it. Commands not
+yet implemented exit non-zero with an "added in Phase X" message; that is deliberate.
 
 ### Commands that work today
 
 | Command | Notes |
 | --- | --- |
-| `npm ci` | |
-| `npm run lint` | Clean |
-| `npx tsc --noEmit` | Clean |
-| `npm run test:rules` | 5 tests, pass |
-| `npm run build:vinext` | Produces `dist/` |
-| `npm test` | **Broken.** Runs `next build`, which does not produce the `dist/` the test imports. Run `npm run build:vinext && node --test tests/rendered-html.test.mjs` instead. Fixed in Phase A. |
+| `pnpm install` · `uv sync --all-packages` | Both lockfiles are committed |
+| `pnpm verify` | **The phase gate.** format, lint, typecheck, unit tests, token contrast, ruff, mypy, pytest |
+| `pnpm build` | Turborepo build across the workspace |
+| `pnpm dev` | web on :3000, api on :8000 |
+| `pnpm dev:infra` | Compose up, waits for health. **Authored but never started — no Docker daemon was available when it was written.** Verify before relying on it |
+| `pnpm test:tokens` | 31 contrast pairs across both themes |
+| `pnpm lint:py` · `typecheck:py` · `test:unit:py` | ruff · mypy · pytest |
 
-### Target commands (Phase A onward)
+### Not yet implemented
 
-`pnpm install` · `dev` · `dev:infra` · `build` · `lint` · `typecheck` · `test` · `test:unit` ·
-`test:integration` · `test:e2e` · `test:visual` · `test:data` · `verify` · `demo:seed` ·
-`demo:reset` · `demo:purge` · `demo:verify`
+`test:e2e` · `test:visual` (Phase E) · `test:data` (Phase D) · `demo:seed` · `demo:reset` ·
+`demo:snapshot` · `demo:purge` · `demo:verify` (Phase F). Each exits non-zero rather than
+succeeding silently.
 
-`pnpm verify` is the gate before claiming a phase complete.
+### Legacy prototype
+
+`legacy/fitos-prototype/` keeps the original Cloudflare-runtime prototype, outside the pnpm
+workspace with its own lockfile ([ADR 0008](docs/adr/0008-hosting-target-and-legacy-runtime.md)).
+Its `npm test` was broken from commit `0d530e2` until Phase A fixed the script wiring; it now
+passes 3/3. Do not reformat this tree — it is preserved, not maintained.
 
 ## Architecture boundaries
 

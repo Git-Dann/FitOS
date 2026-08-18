@@ -1,0 +1,20 @@
+{
+  "name": "@fitos/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tokens.css": "./dist/tokens.css",
+    "./tokens": "./src/tokens.ts"
+  },
+  "scripts": {
+    "build": "node scripts/build-tokens.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --test test/*.test.mjs",
+    "test": "pnpm test:unit"
+  },
+  "devDependencies": {
+    "@fitos/config": "workspace:*",
+    "typescript": "5.9.3"
+  }
+}

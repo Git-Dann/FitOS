@@ -1,0 +1,13 @@
+# Preserved, not maintained. Reformatting it would create a large diff on code
+# we deliberately froze — see docs/adr/0008-hosting-target-and-legacy-runtime.md.
+legacy/
+
+# Prose and specifications. Prettier pads markdown tables to align columns,
+# which produces very large diffs on documents that are edited by hand and read
+# as raw text. Code formatting is enforced; prose formatting is not.
+docs/
+*.md
+
+# Generated output.
+packages/ui/dist/
+pnpm-lock.yaml

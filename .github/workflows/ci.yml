@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege. Widen per-job only where a job genuinely needs more.
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22.22.2"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  javascript:
+    name: JS — format, lint, typecheck, unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build --filter @fitos/ui
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:unit
+      - name: Design tokens meet WCAG 2.2 AA in both themes
+        run: pnpm test:tokens
+
+  python:
+    name: Python — lint, typecheck, unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --frozen
+      - run: uv run ruff check services
+      - run: uv run ruff format --check services
+      - run: uv run mypy services
+      - run: uv run pytest -q -m "not integration"
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  legacy:
+    name: Legacy prototype (preserved, not maintained)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: legacy/fitos-prototype
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run test:rules
+      - run: npm test
+
+  supply-chain:
+    name: Dependency audit and secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans history
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Audit platform dependencies (gating)
+        run: pnpm audit --audit-level high
+      - name: Audit legacy dependencies (reported, not gating)
+        # Recorded, dated exception — docs/spec-review.md T4. The legacy tree
+        # keeps its own lockfile outside the workspace, so its ~16 high-severity
+        # Cloudflare-toolchain advisories are not in the platform graph. They are
+        # reported here rather than hidden. Revisit if legacy ever ships to a host.
+        continue-on-error: true
+        working-directory: legacy/fitos-prototype
+        run: npm audit --audit-level high
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  visual-regression:
+    name: Visual regression (activates in Phase E)
+    runs-on: ubuntu-latest
+    # Deliberately skipped, not stubbed green. No route exists before Phase E,
+    # so there are no approved baselines to compare against — and a green check
+    # for a job with no baselines is worse than no check at all
+    # (docs/spec-review.md T2). Remove this guard when Phase E adds baselines.
+    if: ${{ false }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pnpm test:visual

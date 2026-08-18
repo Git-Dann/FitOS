@@ -1,0 +1,40 @@
+{
+  "name": "fitos",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:infra": "bash infra/scripts/dev-infra.sh up",
+    "dev:infra:down": "bash infra/scripts/dev-infra.sh down",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "lint:py": "uv run ruff check services && uv run ruff format --check services",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,yaml,yml}\"",
+    "typecheck": "turbo run typecheck",
+    "typecheck:py": "uv run mypy services",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:unit:py": "uv run pytest -m 'not integration'",
+    "test:integration": "uv run pytest -m integration",
+    "test:e2e": "echo 'test:e2e — added in Phase E' && exit 0",
+    "test:visual": "echo 'test:visual — added in Phase E' && exit 0",
+    "test:data": "echo 'test:data — added in Phase D' && exit 0",
+    "test:tokens": "node docs/design-tokens/check-contrast.mjs",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm test:tokens && pnpm lint:py && pnpm typecheck:py && pnpm test:unit:py",
+    "demo:seed": "echo 'demo:seed — added in Phase F' && exit 1",
+    "demo:reset": "echo 'demo:reset — added in Phase F' && exit 1",
+    "demo:snapshot": "echo 'demo:snapshot — added in Phase F' && exit 1",
+    "demo:purge": "echo 'demo:purge — added in Phase F' && exit 1",
+    "demo:verify": "echo 'demo:verify — added in Phase F' && exit 1"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2",
+    "turbo": "2.5.8",
+    "typescript": "5.9.3"
+  }
+}
