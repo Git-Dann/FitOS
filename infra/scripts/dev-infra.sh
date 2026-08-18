@@ -19,6 +19,21 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
+# ClickHouse wants 262144 file descriptors. A container cannot raise its own
+# hard limit, so where the host's is lower the daemon refuses to start the
+# container — an obscure "error setting rlimit type 7" that reads like a Compose
+# fault and is not one. Clamp to what the host actually allows, and say so, so
+# the difference from the intended value is visible rather than silent.
+CLICKHOUSE_NOFILE_TARGET=262144
+HOST_NOFILE_HARD="$(ulimit -n -H 2>/dev/null || echo unlimited)"
+if [ "$HOST_NOFILE_HARD" != "unlimited" ] && [ "$HOST_NOFILE_HARD" -lt "$CLICKHOUSE_NOFILE_TARGET" ]; then
+  export FITOS_CLICKHOUSE_NOFILE="$HOST_NOFILE_HARD"
+  echo "note: this host caps open files at ${HOST_NOFILE_HARD}; ClickHouse wants ${CLICKHOUSE_NOFILE_TARGET}." >&2
+  echo "      clamping to the host limit. Fine for development; raise it on anything load-bearing." >&2
+else
+  export FITOS_CLICKHOUSE_NOFILE="$CLICKHOUSE_NOFILE_TARGET"
+fi
+
 case "${1:-up}" in
   up)
     echo "starting FitOS local infrastructure…"

@@ -10,21 +10,22 @@ Phase B — auth and tenancy.
 
 ## status
 
-**Acceptance checks pass. Two Phase A items remain unverified and now block Phase C.**
+**Acceptance checks pass. The two long-standing Phase A verification gaps are now closed.**
 
 All five Phase B acceptance criteria are met and each is backed by a test that has been run
 against real PostgreSQL rather than a mock — RLS cannot be exercised against a mock, and an
 untested RLS policy is worth nothing. 132 Python tests pass; `pnpm verify` exits 0.
 
-The two open items are unchanged from Phase A and have the same single cause: this container has
-no Docker daemon, so Compose has never been started and the footprint has never been measured.
-Neither is a defect in the work. Both are listed as unverified rather than assumed good, and both
-gate Phase C, which needs ClickHouse, MinIO and Temporal actually running.
+Risks 1 and 2 had been open since Phase A because this container reported no Docker daemon. It
+turned out `dockerd` was installed and simply not running. Started by hand, the stack came up and
+**found three real bugs that no amount of reading the file would have shown** — see
+[what starting Compose found](#what-starting-compose-found). All seven services now reach healthy
+in 18 seconds and the footprint is measured.
 
-This environment worked around the missing daemon by initialising a PostgreSQL 16.13 cluster
-directly from the server binaries at `/usr/lib/postgresql/16/bin` on port 5433. That is what made
-every tenancy claim below provable by execution. It does not close risk 1: one database is not the
-five-service Compose stack.
+Tenancy work earlier in the phase used a PostgreSQL 16.13 cluster initialised directly from the
+server binaries at `/usr/lib/postgresql/16/bin` on port 5433, which is what made every claim below
+provable before Docker was available. The migrations have since been applied to the Compose
+PostgreSQL as well, so the schema is proven on both.
 
 ## acceptance
 
@@ -91,6 +92,11 @@ PostgreSQL 16.13 on port 5433, initialised from the server binaries in this cont
 | `alembic upgrade head` on a fresh database | 0001 → 0002 → 0003 → 0004, clean |
 | `psql -U fitos_app -c "SELECT count(*) FROM jwks"` | `ERROR: permission denied for table jwks` |
 | `pnpm --filter @fitos/web typecheck` | exit 0 |
+| `pnpm build` with no secrets in the environment | exit 0 — the build must not need the signing secret |
+| `pnpm dev:infra` | **7/7 healthy in 18s** |
+| `alembic upgrade head` against the Compose postgres | 0001 → 0004, clean |
+| `SELECT version()` on ClickHouse over HTTP | `24.8.14.39`; `SHOW DATABASES` includes `fitos` |
+| MinIO `/minio/health/live` · Cube `/readyz` · Temporal UI `/` | 200 · 200 · 200 |
 | `pnpm run issue-token` → `TokenVerifier.verify_with_key` | `VerifiedToken(user_id=…, organization_id=None)` |
 
 ## test_results
@@ -187,22 +193,70 @@ here gets a test that it fails when it should.
 
 | # | Risk | Status |
 | --- | --- | --- |
-| 1 | **Compose is unverified.** No Docker daemon in this environment | **Open, blocking for Phase C.** Syntax-valid, versions pinned, no container ever started. |
-| 2 | **Compose footprint unmeasured** | **Open.** `pnpm dev:infra footprint` exists and has never run. Needed before the ≈1.42M-record dataset lands in Phase F. |
-| 3 | Five infra containers plus ≈1.42M records versus p95 targets on a laptop | Unchanged. Cannot be assessed until risk 2 closes. |
+| 1 | **Compose is unverified** | **Closed.** All seven services healthy in 18s, after fixing the three bugs starting it exposed. |
+| 2 | **Compose footprint unmeasured** | **Closed.** 589 MiB across seven containers at idle; 3.38 GB of images. See [footprint](#footprint). |
+| 3 | Seven containers plus ≈1.42M records versus p95 targets on a laptop | **Reduced.** Idle cost is modest — 589 MiB, well inside a 16 GB laptop. Unknown under load: this is an idle measurement, and the dataset does not exist yet. Re-measure in Phase F with data present. |
 | 4 | 16 high-severity advisories in the legacy Cloudflare toolchain | **Contained.** Outside the workspace with its own lockfile; reported through a non-gating job. |
 | 5 | Cube × ClickHouse × dbt-clickhouse compatibility | Pinned, untested until risk 1 closes. |
 | 6 | Better Auth is young for a security-critical position | **Reduced, not closed.** The boundary is now real: it issues and stores identity, and holds no authorisation state. A compromise still forges identity, but not authority — the membership row decides that. |
 | 7 | CI has never executed | **Closed** in Phase A. Runs 1 and 2 recorded below. |
 | 8 | The `identity` CI job has never run | **Open.** Added this session; the JWKS contract passes locally but the job itself is unexecuted. Same class of risk as 7 was. |
 
+## footprint
+
+Measured at idle with `pnpm dev:infra:footprint`, on a 16 GB host, immediately after a clean start
+with empty volumes. **This is the floor, not the ceiling** — there is no data yet, and the ≈1.42M
+record demo dataset arrives in Phase F. Re-measure then.
+
+| Container | Memory | CPU |
+| --- | --- | --- |
+| clickhouse | 269.4 MiB | 4.43% |
+| cube | 113.0 MiB | 18.90% |
+| minio | 73.4 MiB | 0.04% |
+| postgres_temporal | 58.4 MiB | 0.32% |
+| temporal | 52.5 MiB | 1.99% |
+| postgres | 18.8 MiB | 0.02% |
+| temporal_ui | 3.8 MiB | 0.00% |
+| **total** | **589 MiB** | |
+
+Disk: 3.38 GB of images, 138 MB of volumes. Cold start including image pulls took roughly nine
+minutes; warm start is 18 seconds.
+
+Cube at 18.9% CPU while idle is the one number worth watching. It is a development-mode container
+doing nothing, and it costs more CPU than ClickHouse.
+
+## what_starting_compose_found
+
+Three bugs, all in code that had been reviewed and none of which could be found by reading it.
+This is the whole argument for the rule that a phase is not complete until its commands have run.
+
+1. **The Temporal healthcheck probed the wrong address.** It used `127.0.0.1:7233`, but the
+   frontend binds the container's network address rather than loopback, so the probe was refused
+   while the server was serving perfectly. Temporal never reported healthy, which blocked
+   `temporal_ui` on a dependency that was fine, which failed the whole `--wait`. Now `temporal:7233`.
+2. **The Cube healthcheck used a binary the image does not have.** `wget` is not in the Cube image
+   and neither is `curl`, so the probe exited 127 and the container was permanently unhealthy for
+   want of a tool rather than for any reason to do with Cube. It does have node; the probe now uses
+   `fetch`.
+3. **`pnpm dev:infra footprint` silently ran `up`.** The package script hardcoded the `up`
+   subcommand, so the argument was appended after it and ignored. The footprint command named in
+   Phase A's acceptance criteria had therefore never run — and would have appeared to work, because
+   `up` on a running stack succeeds. Split into `dev:infra:status` and `dev:infra:footprint`.
+
+A fourth, environmental rather than a defect: ClickHouse asks for 262144 file descriptors, and a
+container cannot raise its own hard limit, so on a constrained host the daemon refuses to start it
+with `error setting rlimit type 7` — which reads like a Compose fault and is not one.
+`dev-infra.sh` now clamps to the host's hard limit and prints what it did, so the gap from the
+intended value is visible rather than silent.
+
 ## next_phase
 
 **Phase C — data plane.** Acceptance criteria in
 [implementation-plan.md](implementation-plan.md#phase-c--data-plane).
 
-Close risks 1, 2 and 8 first. Phase C needs ClickHouse, MinIO and Temporal genuinely running, so
-the Docker gap stops being a deferred item and becomes the first blocker.
+The infrastructure blocker is gone: ClickHouse, MinIO, Temporal and Cube are running and answering.
+Risk 8 remains — the `identity` CI job has still never executed — and should be confirmed on the
+first push of the next session rather than deferred again.
 
 ## next_session_prompt
 
@@ -211,11 +265,9 @@ Read @docs/master-build-brief.md, @docs/build-state.md, @docs/implementation-pla
 @CLAUDE.md, @docs/connector-sdk.md, @docs/data-contracts.md and @docs/adr/0002-analytics-store.md.
 Start in Plan Mode.
 
-First close the three verification gaps, which need a Docker-capable machine. Run
-`pnpm dev:infra` and confirm every container reaches healthy. Run `pnpm dev:infra footprint`
-and record container memory and startup time in docs/build-state.md. Confirm CI is green on
-the branch, including the new `identity` job, which has never executed. If a container fails
-to start, fix Compose before writing any Phase C code — the whole phase depends on it.
+Compose is verified and the footprint is recorded, so start by running `pnpm dev:infra` and
+confirming 7/7 healthy — if `dockerd` is not running, start it; it is installed. Then confirm
+CI is green on the branch, including the `identity` job, which has still never executed.
 
 Then implement Phase C: raw object storage with immutability; the connector SDK; CSV/XLSX
 upload and generic REST connectors; Temporal workflows for runs, backfills and retries; the
@@ -292,4 +344,4 @@ needs that input set explicitly under setup-node v5.
 | 1 | Audit and specification | 37 files: audit, 11 specification documents, 8 ADRs, contradiction review (14 items), Claude Code configuration. Verified regression found in `npm test`. |
 | 1b | Palette | Near-black + orange, dark default, 31 contrast pairs measured rather than asserted. Both open questions closed by the repository owner. |
 | 2 | A — repository and platform | Monorepo, legacy preserved with history, health probes, tokens as code, Compose, CI skeleton. `pnpm verify` exit 0. Three items unverified for lack of a daemon. |
-| 3 | B — auth and tenancy | RLS proven against real PostgreSQL, ADR 0009, the Gap aggregate, invitations, Better Auth with the JWKS contract tested across runtimes. 132 tests. Four real bugs found by execution, including a coverage guard that had been checking nothing. |
+| 3 | B — auth and tenancy | RLS proven against real PostgreSQL, ADR 0009, the Gap aggregate, invitations, Better Auth with the JWKS contract tested across runtimes. 132 tests. Seven real bugs found by execution — four in the auth and schema work, three more the moment Compose was started for the first time. |

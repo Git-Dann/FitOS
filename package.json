@@ -8,8 +8,10 @@
   },
   "scripts": {
     "dev": "turbo run dev",
-    "dev:infra": "bash infra/scripts/dev-infra.sh up",
+    "dev:infra": "bash infra/scripts/dev-infra.sh",
     "dev:infra:down": "bash infra/scripts/dev-infra.sh down",
+    "dev:infra:status": "bash infra/scripts/dev-infra.sh status",
+    "dev:infra:footprint": "bash infra/scripts/dev-infra.sh footprint",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "lint:py": "uv run ruff check services && uv run ruff format --check services && uv run python services/api/tools/check_no_role_comparisons.py services",

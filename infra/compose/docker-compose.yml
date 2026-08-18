@@ -50,8 +50,16 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     ports: ["8123:8123", "9000:9000"]
     volumes: ["clickhouse_data:/var/lib/clickhouse"]
+    # ClickHouse recommends a high file-descriptor limit; 262144 is the value
+    # for a real host. A container cannot raise its own hard limit, so on a
+    # constrained host (a CI runner, or a nested container) the daemon refuses
+    # to start the container at all — "error setting rlimit type 7". dev-infra.sh
+    # reads the host's hard limit and exports this variable, clamping when it
+    # has to and saying so.
     ulimits:
-      nofile: { soft: 262144, hard: 262144 }
+      nofile:
+        soft: ${FITOS_CLICKHOUSE_NOFILE:-262144}
+        hard: ${FITOS_CLICKHOUSE_NOFILE:-262144}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
       interval: 5s
@@ -84,7 +92,11 @@ services:
       POSTGRES_SEEDS: postgres_temporal
     ports: ["7233:7233"]
     healthcheck:
-      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "127.0.0.1:7233"]
+      # `temporal:7233`, not `127.0.0.1:7233`. The frontend binds the container's
+      # network address rather than loopback, so the loopback form is refused and
+      # the service never reports healthy even while it is serving perfectly —
+      # which then blocks temporal_ui on a dependency that is actually fine.
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -114,7 +126,16 @@ services:
     ports: ["4000:4000"]
     volumes: ["../../services/semantic:/cube/conf"]
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4000/readyz"]
+      # The Cube image has no wget and no curl, so a wget probe exits 127 and the
+      # container is permanently unhealthy for want of a binary rather than for
+      # any reason to do with Cube. It does have node.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 30
