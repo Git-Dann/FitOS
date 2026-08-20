@@ -16,16 +16,30 @@ body {
   margin: 0;
   background: var(--bg-canvas);
   color: var(--fg-default);
+  /* §3 Fallback Stack, with Inter loaded through next/font ahead of it. */
   font-family:
-    ui-sans-serif,
-    system-ui,
+    var(--font-sans),
     -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
     "Segoe UI",
     Roboto,
+    Helvetica,
+    Arial,
     sans-serif;
-  font-size: 13px;
-  line-height: 1.5;
+  /* §3 Feature Settings: cv11, ss03. */
+  font-feature-settings: "cv11", "ss03";
+  font-size: var(--text-sm);
+  line-height: 1.35;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Mono carries identity, never content: gap references and keyboard shortcuts.
+   §3: "Mono for identity, sans for content". */
+.mono,
+kbd {
+  font-family: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Tabular numerals everywhere a number can change in place. */
@@ -59,30 +73,78 @@ body {
    --------------------------------------------------------------------------- */
 
 :root {
-  --row-height-compact: 32px;
-  --row-height-comfortable: 44px;
+  /* --- density (DESIGN.md §4, Issue Row) ------------------------------------
+     "Height: 44pt (compact) / 52pt (comfortable)". Compact is the default
+     because "density is the value proposition"; comfortable is the persisted
+     user preference §5 of our own design system has always promised. */
+  --row-height-compact: 44px;
+  --row-height-comfortable: 52px;
   --row-height-touch: 48px;
 
-  --text-2xs: 10px;
-  --text-xs: 11px;
-  --text-sm: 13px;
-  --text-base: 15px;
-  --text-lg: 18px;
-  --text-xl: 22px;
-  --text-2xl: 28px;
+  /* --- type ramp (§3 Hierarchy) --------------------------------------------
+     Inter at 400/500/600 over an 11-28pt range. There is no display step: the
+     product has no marketing surface, so the gap title is the headline. */
+  --text-2xs: 11px; /* tiny UPPER label, 600, +0.4 tracking */
+  --text-xs: 12px; /* meta, count, label pill, command shortcut */
+  --text-sm: 13px; /* metadata, mono identifier */
+  --text-md: 14px; /* command row, sidebar item, button */
+  --text-base: 15px; /* row title (500) and body (400) */
+  --text-lg: 17px; /* section header, view title in a top bar */
+  --text-xl: 22px; /* view title */
+  --text-2xl: 28px; /* screen title — the largest step there is */
 
-  --nav-width: 216px;
+  /* Negative tracking on titles only, easing to 0 at body. */
+  --track-2xl: -0.4px;
+  --track-xl: -0.3px;
+  --track-lg: -0.2px;
+  --track-base: -0.1px;
+  --track-upper: 0.4px;
+
+  /* --- spacing (§5) — base 4, scale 4/6/8/12/16/20/24/32/40/56 ------------- */
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-14: 56px;
+
+  /* --- radius (§5 Border Radius Scale) ------------------------------------- */
+  --radius-sharp: 0;
+  --radius-subtle: 6px; /* label pills, icon-button hover, dropdown menus */
+  --radius-standard: 8px; /* buttons, inputs, status pills */
+  --radius-comfortable: 12px; /* command menu sheet, modals */
+  --radius-circle: 50%; /* avatars only */
+
+  /* --- layout -------------------------------------------------------------- */
+  --nav-width: 280px; /* §4 Sidebar: "280pt wide" */
+  --nav-width-collapsed: 56px;
   --peek-width: 480px;
+  --command-width: 560px; /* §4: "560pt (regular)" */
+  --topbar-height: 44px; /* §4 Top Bar: "44pt + safe area" */
+  --gutter: 16px; /* §5: "16pt horizontal insets" */
 
-  --shadow-peek: 0 16px 48px rgb(0 0 0 / 0.45);
-  --shadow-menu: 0 8px 24px rgb(0 0 0 / 0.35);
-}
+  /* --- elevation (§6) -----------------------------------------------------
+     "Linear avoids shadows almost entirely — elevation is communicated by a
+     one-step background lift and a precise 1pt border, not by blur. The only
+     true shadows are on floating surfaces." Two shadows, both dark and soft. */
+  --shadow-menu: 0 8px 24px rgb(0 0 0 / 0.4);
+  --shadow-peek: 0 24px 64px rgb(0 0 0 / 0.6);
+  --scrim: rgb(0 0 0 / 0.5);
 
-:root[data-theme="light"] {
-  /* Light needs a shallower shadow: the same alpha on a tinted ground reads as
-     dirt rather than elevation. */
-  --shadow-peek: 0 16px 40px rgb(16 20 28 / 0.14);
-  --shadow-menu: 0 8px 20px rgb(16 20 28 / 0.1);
+  /* --- motion (§6 Motion) -------------------------------------------------
+     "Animate fast (90-240ms) — every transition should feel near-instant."
+     Nothing here may exceed 240ms; the row cross-fade is 90ms and does not
+     move, because "speed > flourish". */
+  --motion-row: 90ms;
+  --motion-command: 120ms;
+  --motion-morph: 150ms;
+  --motion-sidebar: 220ms;
+  --motion-panel: 240ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* --- shell ---------------------------------------------------------------- */
@@ -93,55 +155,61 @@ body {
   min-height: 100vh;
 }
 
+/* §4 Sidebar: "280pt wide, background #08090A" — the same ground as the canvas,
+   separated by a hairline rather than a fill. §7: "Don't add a bottom tab bar —
+   navigation is the slide-over sidebar." */
 .nav {
   border-right: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  padding: 12px 8px;
+  background: var(--bg-canvas);
+  padding: var(--space-3) var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px 14px;
-  font-size: var(--text-sm);
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-2) var(--space-4);
+  font-size: var(--text-md);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--track-base);
 }
 
 .nav-mark {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-subtle);
   background: var(--accent-fill);
   color: var(--on-accent);
   display: grid;
   place-items: center;
   font-size: var(--text-2xs);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .nav-section {
-  margin-top: 16px;
-  padding: 0 8px 6px;
+  margin-top: var(--space-4);
+  padding: 0 var(--space-2) var(--space-1-5);
   font-size: var(--text-2xs);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-upper);
   text-transform: uppercase;
-  color: var(--fg-subtle);
+  font-weight: 600;
+  color: var(--fg-muted);
 }
 
+/* §4: "Item height: 32pt, icon 16pt + label 14pt w500". */
 .nav-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  min-height: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
-  font-size: var(--text-sm);
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-subtle);
+  font-size: var(--text-md);
+  font-weight: 500;
   color: var(--fg-muted);
   text-decoration: none;
   background: none;
@@ -149,17 +217,36 @@ body {
   width: 100%;
   cursor: pointer;
   text-align: left;
+  transition: background-color var(--motion-row) var(--ease-out);
 }
 
-.nav-item:hover {
+.nav-item:hover:not(:disabled) {
   background: var(--bg-raised);
   color: var(--fg-default);
 }
 
+/* §4: "Active item: background rgba(94,106,210,0.14), label #F7F8F8, 16pt icon
+   #5E6AD2". The label is never purple — see the note in check-contrast.mjs. */
 .nav-item[aria-current="page"] {
-  background: var(--bg-raised);
+  background: var(--accent-wash);
   color: var(--fg-default);
-  font-weight: 600;
+}
+
+.nav-item[aria-current="page"] .nav-glyph {
+  color: var(--accent-glyph);
+}
+
+.nav-glyph {
+  width: 16px;
+  display: inline-grid;
+  place-items: center;
+  margin-right: var(--space-2);
+  color: inherit;
+}
+
+.nav-item:disabled {
+  color: var(--fg-subtle);
+  cursor: not-allowed;
 }
 
 .nav-count {
@@ -170,24 +257,25 @@ body {
 
 /* --- top bar -------------------------------------------------------------- */
 
+/* §4 Top Bar: "Height: 44pt … No blur — opaque #08090A; speed favors no
+   compositing cost." */
 .topbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 56px;
-  padding: 0 16px;
+  gap: var(--space-3);
+  min-height: var(--topbar-height);
+  padding: 0 var(--gutter);
   border-bottom: 1px solid var(--border-default);
-  background: var(--bg-surface);
+  background: var(--bg-canvas);
 }
 
-/* §3 puts route titles at text-xl. This was text-sm, which made the <h1>
-   smaller than the row titles underneath it — the route where hierarchy
-   matters most was the one spending nothing on it. */
+/* §3: the view title in a top bar is 17pt w600. There is no display step in
+   this system — "the issue title is the headline". */
 .topbar h1 {
   margin: 0;
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--track-lg);
 }
 
 .topbar-spacer {
@@ -200,13 +288,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* §4: "Below: optional filter chip row (28pt pills) when filters are active". */
 .toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px 10px;
-  min-height: 40px;
-  padding: 7px 16px;
+  gap: var(--space-1) var(--space-2);
+  min-height: 36px;
+  padding: var(--space-1-5) var(--gutter);
   border-bottom: 1px solid var(--border-default);
   font-size: var(--text-xs);
   color: var(--fg-muted);
@@ -255,100 +344,114 @@ body {
 
 /* --- situation strip ------------------------------------------------------ */
 
-/* The orientation band. Deliberately not "three metric cards": one hairline
-   container, three columns, no fills and no shadows. §4 forbids giant metric
-   cards, and §2 keeps accent for interaction — nothing here is coloured to
-   look urgent, because urgency is the rows' job. */
+/* A documented deviation from the source spec, kept deliberately quiet.
+ *
+ * Linear has no summary band: its list opens straight onto rows, and §5 rules
+ * out "hero areas, oversized headers, breathing room for its own sake". But a
+ * gap ledger is not an issue tracker — an issue's cost is not a number on the
+ * row, and the first question here is "how bad is today", which a list cannot
+ * answer. The previous build shipped this at 28px and it read as exactly the
+ * hero the spec forbids.
+ *
+ * So it stays, in the spec's vocabulary: figures at the 17pt section-header
+ * step rather than the 28pt screen-title step, captions at 12pt, one hairline
+ * below, no fills, no cards, no shadow. It reads as a caption band, which is
+ * how Linear treats the cycle-progress summary it does have.
+ */
 .situation {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 24px;
-  padding: 16px 16px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-6);
+  padding: var(--space-2) var(--gutter) var(--space-3);
   border-bottom: 1px solid var(--border-default);
-  background: var(--bg-surface);
+  background: var(--bg-canvas);
 }
 
 .situation-figure {
   min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
 }
 
 .situation-label {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: var(--text-2xs);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--track-upper);
   text-transform: uppercase;
-  color: var(--fg-subtle);
+  font-weight: 600;
+  color: var(--fg-muted);
 }
 
-/* The largest type in the signed-in product, and the only place it appears. */
+/* The section-header step, not the screen-title step. */
 .situation-value {
   margin: 0;
-  font-size: var(--text-2xl);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  font-size: var(--text-lg);
+  line-height: 1.3;
+  letter-spacing: var(--track-lg);
   font-weight: 600;
   color: var(--fg-default);
 }
 
-/* "withheld", "none priced", "not summable" are sentences, not figures, and
-   must not be mistaken for one at a glance. */
 .situation-value-absent {
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   font-weight: 500;
   color: var(--fg-muted);
 }
 
 .situation-value-unit {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 400;
   color: var(--fg-subtle);
   letter-spacing: 0;
 }
 
 .situation-note {
-  margin: 5px 0 0;
+  margin: 0;
   font-size: var(--text-xs);
-  color: var(--fg-muted);
-  max-width: 46ch;
+  color: var(--fg-subtle);
+  max-width: 52ch;
 }
 
 .situation-note strong {
-  color: var(--fg-default);
+  color: var(--fg-muted);
   font-weight: 600;
 }
 
 .situation-severities {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 8px;
+  gap: var(--space-1);
 }
 
+/* §4 Label Pills, reused: a glyph and a count in a raised container. */
 .sev-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 24px;
-  padding: 0 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border-default);
-  background: none;
+  gap: var(--space-1-5);
+  min-height: 22px;
+  padding: 0 var(--space-1-5);
+  border-radius: var(--radius-subtle);
+  border: 0;
+  background: var(--bg-raised);
   color: var(--fg-muted);
   font: inherit;
   font-size: var(--text-xs);
   cursor: pointer;
+  transition: background-color var(--motion-row) var(--ease-out);
 }
 
 .sev-pill:hover {
-  background: var(--bg-raised);
+  background: var(--bg-pressed);
   color: var(--fg-default);
 }
 
 .sev-pill[aria-pressed="true"] {
-  background: var(--bg-raised);
-  border-color: var(--border-strong);
+  background: var(--accent-wash);
   color: var(--fg-default);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .sev-pill-word {
@@ -359,62 +462,53 @@ body {
   color: var(--fg-muted);
 }
 
-.sev-pill-critical {
-  color: var(--status-critical);
-}
-.sev-pill-high {
-  color: var(--status-high);
-}
-.sev-pill-medium {
-  color: var(--status-medium);
-}
-.sev-pill-low {
-  color: var(--status-low);
-}
-
-@media (max-width: 1080px) {
-  .situation {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 720px) {
-  .situation {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-  }
-}
-
 /* --- group headers -------------------------------------------------------- */
 
+/* §4 Group Header: "Height: 36pt … Status icon + label (17pt w600) + count chip
+   … Background: #08090A, sticky on scroll". */
 .group-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 20px 16px 7px;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--gutter);
   margin: 0;
-  font-size: var(--text-2xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
+  font-size: var(--text-lg);
   font-weight: 600;
-}
-
-.group-header {
+  letter-spacing: var(--track-lg);
   color: var(--fg-default);
+  text-transform: capitalize;
+  background: var(--bg-canvas);
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .group-header-count {
-  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--fg-muted);
   letter-spacing: 0;
+  padding: 1px var(--space-1-5);
+  border-radius: var(--radius-subtle);
+  background: var(--bg-raised);
+  font-variant-numeric: tabular-nums;
 }
 
-/* A hairline running to the edge, so the band reads as a divider rather than
-   as a stray label sitting on top of the first row. */
+.group-header-exposure {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--fg-muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.group-header-band {
+  color: var(--fg-subtle);
+}
+
 .group-header-rule {
   flex: 1;
-  height: 1px;
-  background: var(--border-default);
 }
 
 /* --- rows ----------------------------------------------------------------- */
@@ -425,118 +519,101 @@ body {
   padding: 0;
 }
 
-/* Three columns: the rail, the substance, the figures. The rail is what gives
-   severity weight a chip cannot — but it is never the only cue, because the
-   severity word sits in the metadata line and §9 forbids colour alone. */
+/* §4 Issue Row, followed literally.
+   "Layout: 16pt status icon -> 13pt mono identifier -> 15pt title (1-line,
+    ellipsized) -> flex spacer -> priority bars -> 20pt assignee avatar"
+   "Background: transparent (canvas #08090A)"
+   "Divider: 1pt #23252A between rows when grouped headers are present"
+   §5: "Issue rows touch (0pt between) — separation is via hover state and group
+    headers, not gaps." */
 .gap-row {
   display: grid;
-  grid-template-columns: 3px minmax(0, 1fr) auto;
-  gap: 0 14px;
-  align-items: start;
+  grid-template-columns: 16px auto minmax(0, 1fr) auto auto auto auto 14px 20px;
+  align-items: center;
+  gap: var(--space-2);
   width: 100%;
+  min-height: var(--row-height-compact);
+  padding: 0 var(--gutter);
   text-align: left;
   background: none;
   border: 0;
   border-bottom: 1px solid var(--border-default);
-  padding: 10px 16px 11px 13px;
   cursor: pointer;
   color: inherit;
   font: inherit;
+  /* §6: "Row selection: background color cross-fade 90ms, no movement." */
+  transition: background-color var(--motion-row) var(--ease-out);
 }
 
+.density-comfortable .gap-row {
+  min-height: var(--row-height-comfortable);
+  align-items: start;
+  padding: var(--space-1-5) var(--gutter);
+}
+
+/* §6 Depth: "Hover (Level 1): Background shift to #1C1D1F, no shadow — depth
+   via color, not shadow." */
 .gap-row:hover {
-  background: var(--bg-surface);
-}
-
-.gap-row[aria-current="true"] {
   background: var(--bg-raised);
 }
 
-.gap-rail {
-  align-self: stretch;
-  min-height: 34px;
-  border-radius: 999px;
-  background: var(--border-strong);
+/* §4: "Selected: background rgba(94,106,210,0.14), 2pt #5E6AD2 left accent
+   inset". The inset is the only left-edge treatment on a row, which is why the
+   severity rail that used to live there is gone — accent and severity must not
+   compete for the same three pixels. */
+.gap-row[aria-current="true"] {
+  background: var(--accent-wash);
+  box-shadow: inset 2px 0 0 var(--accent-fill);
 }
 
-.gap-row-critical .gap-rail {
-  background: var(--status-critical);
-}
-.gap-row-high .gap-rail {
-  background: var(--status-high);
-}
-.gap-row-medium .gap-rail {
-  background: var(--status-medium);
-}
-.gap-row-low .gap-rail {
-  background: var(--status-low);
+/* §4: "Pressed: background #232428, no scale (speed > flourish)." */
+.gap-row:active {
+  background: var(--bg-pressed);
 }
 
-/* A critical row carries a wash as well as a rail, so the block reads as a
-   region rather than as a list item with a coloured edge. `color-mix` keeps
-   this a token derivation — no literal enters the stylesheet. */
-.gap-row-critical {
-  background: color-mix(in srgb, var(--status-critical) 6%, transparent);
+.density-comfortable .gap-row > * {
+  margin-top: 2px;
 }
 
-.gap-row-critical:hover {
-  background: color-mix(in srgb, var(--status-critical) 11%, transparent);
+.gap-ref {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--fg-muted);
+  white-space: nowrap;
 }
 
-.gap-row-critical[aria-current="true"] {
-  background: color-mix(in srgb, var(--status-critical) 14%, transparent);
-}
-
-.gap-main {
-  display: block;
+.gap-body {
   min-width: 0;
+  display: block;
 }
 
-/* The one line a scanning eye is meant to land on. */
+/* §3: the row title is 15pt w500, one line, ellipsized. It is the headline. */
 .gap-title {
   display: block;
   font-size: var(--text-base);
   font-weight: 500;
   line-height: 1.35;
+  letter-spacing: var(--track-base);
   color: var(--fg-default);
-  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
 }
 
-.gap-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0 7px;
-  margin-top: 3px;
-  font-size: var(--text-xs);
-  color: var(--fg-subtle);
-}
-
-.gap-meta-strong {
-  color: var(--fg-muted);
-}
-
-/* The "so what". It is the reason the row is actionable rather than
-   informational, so it gets its own line rather than a tooltip. */
+/* Only at comfortable density. §7: "Don't pad issue rows for 'breathing room'
+   — that destroys the density that makes Linear fast." */
 .gap-action {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  margin-top: 7px;
+  gap: var(--space-1-5);
+  margin-top: 1px;
   font-size: var(--text-xs);
   min-width: 0;
 }
 
-.gap-action-glyph {
-  color: var(--fg-subtle);
-}
-
 .gap-action-title {
-  color: var(--fg-default);
+  color: var(--fg-muted);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -549,96 +626,124 @@ body {
   min-width: 0;
 }
 
-.gap-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  text-align: right;
+.gap-scope,
+.gap-age {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
   white-space: nowrap;
 }
 
-/* Exposure is the figure that decides which gap gets picked up. It was
-   previously the same weight and colour as the scope label beside it. */
 .gap-exposure {
-  font-size: var(--text-base);
-  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
   color: var(--fg-default);
-  letter-spacing: -0.01em;
+  white-space: nowrap;
+  text-align: right;
 }
 
-.gap-side-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* §4: "Circle (50%): Assignee avatars" at 20pt. */
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-circle);
+  background: var(--bg-raised);
+  color: var(--fg-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
 }
 
-.gap-ref {
-  font-size: var(--text-xs);
+.avatar-empty {
+  background: none;
+  border: 1px dashed var(--border-default);
   color: var(--fg-subtle);
 }
 
-/* --- chips ---------------------------------------------------------------- */
+/* --- glyphs --------------------------------------------------------------- */
 
-/* §2, verbatim: "severity chips use a small coloured dot with neutral text
-   rather than coloured text". The earlier version set the *label* to the status
-   colour, which put a red word six pixels from an orange selection bar — the
-   accent/status collision §2 was written to prevent, since accent-400 and
-   status-high-400 sit at 1.65:1 and cannot be separated by hue.
+/* The drawn status and severity glyphs. Stroke and fill both take `color`, so a
+   single rule themes the whole set and a state change is one class. */
+.glyph {
+  flex: none;
+  stroke: currentColor;
+  fill: currentColor;
+  color: var(--status-neutral);
+  transition: color var(--motion-morph) var(--ease-out);
+}
 
-   The dot is never the only cue: every chip also carries a glyph and the word
-   itself, so it survives greyscale and colour blindness (§9). */
-.chip {
+/* The knockout paths — the check and the cross — are punched out of the filled
+   disc, so they take the canvas colour rather than a lighter grey. */
+.glyph-knockout {
+  stroke: var(--bg-canvas);
+  fill: none;
+}
+
+/* §2 Status System: in-progress is amber, in-review and done are purple,
+   canceled is the tertiary grey, backlog and todo are the secondary grey. */
+.glyph-status-investigating,
+.glyph-status-actioned {
+  color: var(--status-progress);
+}
+
+.glyph-status-validating,
+.glyph-status-resolved {
+  color: var(--status-done);
+}
+
+.glyph-status-dismissed {
+  color: var(--status-canceled);
+}
+
+/* §2 Priority: only Urgent is coloured. High, Medium and Low are all the
+   secondary grey and differ by how many bars are filled — which is what makes
+   severity survive greyscale without a coloured chip. */
+.glyph-urgent {
+  color: var(--status-urgent);
+}
+
+.bar-off {
+  opacity: 0.3;
+}
+
+/* --- state labels and pills ----------------------------------------------- */
+
+/* A drawn glyph plus a neutral word. Not a chip: no border, no fill, no
+   uppercase, no coloured label. §7: "Don't use colored status badges with text
+   — the drawn icon system *is* the language." */
+.state-label {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 18px;
-  padding: 0 7px;
-  border-radius: 6px;
-  font-size: var(--text-2xs);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-weight: 600;
-  border: 1px solid var(--border-default);
-  color: var(--fg-muted);
+  gap: var(--space-1-5);
+  font-size: var(--text-sm);
+  color: var(--fg-default);
+  text-transform: capitalize;
   white-space: nowrap;
 }
 
-.chip-severity {
-  color: var(--fg-default);
+/* §4 Label Pills: "6pt colored dot + label text (12pt w500) in a #1C1D1F
+   rounded container, radius 6pt". Used for source state and reason codes. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-height: 20px;
+  padding: 0 var(--space-1-5);
+  border-radius: var(--radius-subtle);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  background: var(--bg-raised);
+  border: 0;
+  color: var(--fg-muted);
+  white-space: nowrap;
 }
 
 .chip-dot {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
-  background: var(--border-strong);
+  border-radius: var(--radius-circle);
+  background: var(--status-neutral);
   flex: none;
-}
-
-.chip-critical {
-  border-color: var(--status-critical-border);
-}
-.chip-critical .chip-dot {
-  background: var(--status-critical);
-}
-.chip-high {
-  border-color: var(--status-high-border);
-}
-.chip-high .chip-dot {
-  background: var(--status-high);
-}
-.chip-medium {
-  border-color: var(--status-medium-border);
-}
-.chip-medium .chip-dot {
-  background: var(--status-medium);
-}
-.chip-low {
-  border-color: var(--status-low-border);
-}
-.chip-low .chip-dot {
-  background: var(--status-low);
 }
 
 .chip-glyph {
@@ -647,28 +752,44 @@ body {
   color: var(--fg-subtle);
 }
 
-/* --- confidence meter ----------------------------------------------------- */
+/* --- confidence ----------------------------------------------------------- */
 
+/* The four 5px pips this replaces carried almost no information: the whole
+   visual difference between high and medium was one dot moving 50 luminance
+   units. A 32px track reads at a glance, and the band word is the
+   decision-grade summary — the exact score stays in the peek with its
+   component breakdown, because 0.905 invites a comparison the model does not
+   support. */
 .confidence {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1-5);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  white-space: nowrap;
 }
 
-.confidence-pips {
-  display: inline-flex;
-  gap: 2px;
+.confidence-track {
+  width: 32px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-pressed);
+  overflow: hidden;
+  flex: none;
 }
 
-.pip {
-  width: 5px;
-  height: 5px;
-  border-radius: 999px;
-  background: var(--border-strong);
-}
-
-.pip-on {
+.confidence-fill {
+  display: block;
+  height: 100%;
   background: var(--fg-muted);
+}
+
+.confidence-low .confidence-fill {
+  background: var(--status-progress);
+}
+
+.confidence-band {
+  color: var(--fg-muted);
 }
 
 /* --- exposure ------------------------------------------------------------- */
@@ -1379,4 +1500,204 @@ textarea.control[aria-invalid="true"] {
 .control-primary:hover:not(:disabled) {
   border-color: var(--accent-fill);
   filter: brightness(1.08);
+}
+
+/* --- command menu --------------------------------------------------------- */
+
+/* §6 Depth: "Scrim: rgba(0,0,0,0.5) behind the sidebar slide-over and modals". */
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  z-index: 30;
+}
+
+/* §4 Command Menu Sheet: "Width: 560pt … Background: #141516, 1pt border
+   #23252A, corner radius 12pt. Shadow: rgba(0,0,0,0.6) 0 24px 64px". */
+.command {
+  position: fixed;
+  top: 14vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(var(--command-width), calc(100vw - var(--space-6)));
+  max-height: 62vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-comfortable);
+  box-shadow: var(--shadow-peek);
+  z-index: 31;
+  overflow: hidden;
+  /* §4: "fades + scales in from 0.96 in 120ms". */
+  animation: command-in var(--motion-command) var(--ease-out);
+}
+
+@keyframes command-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* Reduced motion keeps the opacity change and drops the scale, per §6 of our
+   own design system: a token-level switch, not a per-component conditional. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes command-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* §4: "Top: 44pt search input, no border, leading magnifyingglass 16pt". */
+.command-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.command-input-glyph {
+  font-size: var(--text-lg);
+  color: var(--fg-muted);
+}
+
+.command-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--text-md);
+  background: none;
+  border: 0;
+  outline: none;
+  color: var(--fg-default);
+  /* §4: "blinking caret #5E6AD2". */
+  caret-color: var(--accent-fill);
+}
+
+.command-input::placeholder {
+  color: var(--fg-subtle);
+}
+
+.command-list {
+  overflow-y: auto;
+  padding: var(--space-1) 0 var(--space-2);
+}
+
+/* §4: "Section captions: 11pt w600 UPPER #8A8F98, 8pt top padding". */
+.command-section {
+  margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track-upper);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+/* §4: "Rows: 40pt each — leading icon → label (14pt w500) → trailing shortcut
+   (mono 12pt #8A8F98)". */
+.command-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+/* §4: "Focused row: background rgba(94,106,210,0.14), label #F7F8F8". */
+.command-row[aria-selected="true"] {
+  background: var(--accent-wash);
+  color: var(--fg-default);
+}
+
+.command-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-shortcut {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.command-empty {
+  margin: 0;
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+/* The toolbar entry point, for anyone who does not know the shortcut yet. */
+.command-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--text-xs);
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-subtle);
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: background-color var(--motion-row) var(--ease-out);
+}
+
+.command-trigger:hover {
+  background: var(--bg-raised);
+  color: var(--fg-default);
+}
+
+/* --- density switch ------------------------------------------------------- */
+
+.density-switch {
+  display: inline-flex;
+  gap: 1px;
+}
+
+/* §7: "Animate fast (90–240ms)". Nothing in this stylesheet exceeds 240ms;
+   the longest is the detail-panel push at exactly that. */
+.peek {
+  animation: peek-in var(--motion-panel) var(--ease-out);
+}
+
+@keyframes peek-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes peek-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 }

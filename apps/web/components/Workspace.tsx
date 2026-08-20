@@ -9,7 +9,7 @@
  * would produce a different payload from the API. Keeping that at the top makes
  * it obvious that no component is deciding what to hide.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { DemoGap, Severity } from "@/lib/demo-gaps";
 import { DEMO_AS_OF } from "@/lib/demo-gaps";
 import { STALE_SECONDS, summarise } from "@/lib/situation";
@@ -21,9 +21,21 @@ import type { TransitionRequest } from "./TransitionControls";
 import type { GapStatus } from "@fitos/contracts/lifecycle";
 import { GapLedger } from "./GapLedger";
 import { AppShell } from "./AppShell";
+import { CommandMenu, type Command } from "./CommandMenu";
+import {
+  DENSITIES,
+  readDensity,
+  serverDensity,
+  subscribeDensity,
+  writeDensity,
+  type Density,
+} from "@/lib/density";
 import { DEMO_SOURCES } from "@/lib/demo-sources";
 
 export type ViewKey = "all" | "mine" | "stale" | "unowned";
+
+/** The severities a gap in this pack can carry, in ranked order. */
+const SEVERITY_FILTERS: Severity[] = ["critical", "high", "medium", "low"];
 
 const VIEWS: { key: ViewKey; label: string; describe: string }[] = [
   { key: "all", label: "All open", describe: "Every gap that is not resolved or dismissed" },
@@ -66,9 +78,26 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
   const [view, setView] = useState<ViewKey>("all");
   const [query, setQuery] = useState("");
   const [severity, setSeverity] = useState<Severity | null>(null);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [state, setState] = useState<LedgerState>({ gaps, audit: {} });
 
   const capabilities = ROLE_CAPABILITIES[role];
+
+  // Read through the store, not mirrored into state — see lib/density.ts.
+  const density = useSyncExternalStore(subscribeDensity, readDensity, serverDensity);
+
+  // ⌘K, and Ctrl+K for anyone not on a Mac. The listener is here rather than in
+  // the menu because the menu does not exist until it opens.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setCommandOpen((open) => !open);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Terminal gaps leave the inbox, which is what makes dismissal feel like the
   // consequential act it is. They are not deleted — the gaps route shows them.
@@ -95,6 +124,45 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
 
   const activeView = VIEWS.find((entry) => entry.key === view);
 
+  // Every entry runs. Nothing here is a placeholder for a route that does not
+  // exist yet — see the note in CommandMenu.tsx.
+  const commands: Command[] = [
+    ...VIEWS.map((entry) => ({
+      id: `view-${entry.key}`,
+      label: `View: ${entry.label}`,
+      section: "Views",
+      keywords: entry.describe,
+      run: () => setView(entry.key),
+    })),
+    ...SEVERITY_FILTERS.map((entry) => ({
+      id: `severity-${entry}`,
+      label: `Filter: ${entry} only`,
+      section: "Filter",
+      keywords: "severity priority",
+      run: () => setSeverity(entry),
+    })),
+    {
+      id: "severity-clear",
+      label: "Filter: clear severity",
+      section: "Filter",
+      run: () => setSeverity(null),
+    },
+    ...DENSITIES.map((entry) => ({
+      id: `density-${entry}`,
+      label: `Density: ${entry}`,
+      section: "Display",
+      keywords: "row height compact comfortable",
+      run: () => writeDensity(entry),
+    })),
+    ...ROLES.map((entry) => ({
+      id: `role-${entry}`,
+      label: `Act as: ${entry}`,
+      section: "Session",
+      keywords: "role impersonate capability exposure",
+      run: () => setRole(entry),
+    })),
+  ];
+
   // One count, derived from the list that is actually on screen. The nav badge,
   // the route title and the ledger cannot disagree because there is nothing for
   // them to disagree about.
@@ -104,6 +172,7 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
 
   return (
     <AppShell
+      className={`density-${density}`}
       title="Inbox"
       inboxCount={visible.length}
       meta={`as of ${dateTime(DEMO_AS_OF)} · ${count(DEMO_SOURCES.length)} sources · ${count(staleSources)} not healthy`}
@@ -116,23 +185,6 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
       />
 
       <div className="toolbar">
-        <label className="visually-hidden" htmlFor="role">
-          Role
-        </label>
-        <select
-          id="role"
-          className="control"
-          value={role}
-          onChange={(event) => setRole(event.target.value as Role)}
-          title="Switch role. Exposure is withheld from a frontline payload server-side."
-        >
-          {ROLES.map((entry) => (
-            <option key={entry} value={entry}>
-              {entry}
-            </option>
-          ))}
-        </select>
-
         <div className="view-tabs" role="tablist" aria-label="Saved views">
           {VIEWS.map((entry) => (
             <button
@@ -165,6 +217,34 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
         ) : null}
 
         <span className="topbar-spacer" />
+        <div className="density-switch" role="group" aria-label="Row density">
+          {DENSITIES.map((entry) => (
+            <button
+              key={entry}
+              type="button"
+              className="view-tab"
+              aria-pressed={density === entry}
+              onClick={() => writeDensity(entry)}
+              title={
+                entry === "compact"
+                  ? "44px rows — the most gaps in view"
+                  : "52px rows — adds the recommended next step to each row"
+              }
+            >
+              {entry}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="command-trigger"
+          onClick={() => setCommandOpen(true)}
+          aria-label="Open the command menu"
+        >
+          <span aria-hidden="true">⌕</span> Command
+          <kbd>⌘K</kbd>
+        </button>
         <span className="toolbar-count tabular">
           {count(filtered.length)} of {count(visible.length)}
         </span>
@@ -197,6 +277,7 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
         <GapLedger
           gaps={filtered}
           capabilities={capabilities}
+          density={density}
           audit={state.audit}
           onAssign={(gapId, owner) => setState((current) => assign(current, gapId, owner))}
           onTransition={(gapId, request: TransitionRequest) =>
@@ -206,6 +287,9 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
           }
         />
       )}
+      {commandOpen ? (
+        <CommandMenu commands={commands} onClose={() => setCommandOpen(false)} />
+      ) : null}
     </AppShell>
   );
 }

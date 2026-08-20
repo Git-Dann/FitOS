@@ -3,168 +3,206 @@
 Tokens, primitives and product components live in `packages/ui`. FitOS owns the visual language;
 Radix supplies behaviour only. A default shadcn surface is not an acceptable end state.
 
+## 0. Source
+
+The visual language is **Linear's iOS design system**, taken from
+`design-md/productivity/linear/DESIGN.md` in
+[Meliwat/awesome-ios-design-md](https://github.com/Meliwat/awesome-ios-design-md) and copied
+exactly. Colour values, the type ramp, the spacing and radius scales, the elevation model, the
+motion durations, the row geometry and the component specs below are that document's, quoted where
+it is easier to quote than to paraphrase.
+
+This is a reversal. Earlier revisions of this file took Linear as an *interaction* reference and
+said the brief "explicitly forbids copying its branding or colours", with an orange accent chosen
+specifically so as not to be Linear's blue-violet. That is no longer the instruction and the file
+should not read as though it were.
+
+Every place the implementation departs from the source is listed in §10 with its reason, and the
+machine-checkable ones are recorded in `$deviations` in
+[`tokens.json`](design-tokens/tokens.json). Two constraints outrank the source spec and are the
+origin of most of those departures:
+
+- **WCAG 2.2 AA** (§9) is a commitment the source document does not make. It is not dropped to
+  match a value.
+- **The gap model.** `gap-model.md` §3 requires exposure to appear as a range with its confidence
+  band adjacent, on every surface. An issue tracker has nothing equivalent, so the row's trailing
+  zone carries two values Linear's does not.
+
 ## 1. Token architecture
 
 Three tiers. Components consume tier 3 only — a component that references a tier-1 value directly is
 a lint failure, because that is how themes rot.
 
 ```text
-1. primitive   --neutral-50 … --neutral-950, --accent-50 … --accent-950,
-               --status-{critical,high,medium,low}-{400,700}
-2. semantic    --bg-canvas, --bg-surface, --bg-raised, --fg-default, --fg-muted, --fg-subtle,
-               --border-default, --border-strong, --accent-fg, --accent-fill, --on-accent,
-               --focus-ring, --status-{critical,high,medium,low}
-3. component   --row-height, --peek-width, --nav-width, --chart-grid, --chart-mark-*
+1. primitive   --ink-{canvas,surface1..3,divider,text1..3,white}
+               --paper-{canvas,surface1..3,divider,text1..3}
+               --purple-{base,pressed,wash-dark,wash-light}
+               --status-{amber,red,green}[-on-light][-glyph-on-light]
+2. semantic    --bg-{canvas,surface,raised,pressed}, --fg-{default,muted,subtle},
+               --border-{default,strong}, --accent-{fill,pressed,glyph,wash}, --on-accent,
+               --focus-ring, --status-{urgent,progress,done,neutral,canceled},
+               --success, --warning, --error
+3. component   --row-height-{compact,comfortable}, --text-*, --track-*, --space-*, --radius-*,
+               --motion-*, --nav-width, --peek-width, --command-width, --topbar-height
 ```
 
-**Dark is the default theme.** Light is a full peer, built and tested, not an afterthought applied
-with a filter — but the product is designed dark-first and the dark values are the ones tuned by
-eye. Both are two definitions of tier 2 over the same tier 1.
+**Dark is the default theme.** The source system is dark-first and calls light a limited variant;
+light is still built, reachable from the top bar, persisted, and captured at every viewport by
+`apps/web/scripts/capture.mjs`, because a theme nobody can switch to is a theme nobody has looked
+at. Both are two definitions of tier 2 over the same tier 1.
 
 ## 2. Colour
 
-A near-black neutral ground with a single orange accent. Values live in
+A near-OLED black ground with a single purple accent. Values live in
 [`docs/design-tokens/tokens.json`](design-tokens/tokens.json) and are verified by
 `node docs/design-tokens/check-contrast.mjs`, which exits non-zero on any failing pair. That script
-is the source of truth for the ratios quoted below; it moves into `packages/ui` and becomes a CI
-gate in Phase E.
+is the source of truth for the ratios quoted below.
 
-This replaces the legacy prototype's off-white and deep-green palette, which stays in `legacy/`.
-
-### Primitive ramps
+### Primitive values
 
 ```text
-neutral   50 #F7F8F9   100 #EDEEF1   200 #DCDEE3   300 #C0C3CB   400 #9497A1   500 #7A7E88
-         600 #616570   700 #494D55   800 #2E3138   900 #1A1C21   950 #0B0C0E
+ink      canvas #08090A   surface1 #141516   surface2 #1C1D1F   surface3 #232428
+         divider #23252A  text1 #F7F8F8      text2 #8A8F98      text3 #5C5F6A
 
-accent    50 #FFF4ED   100 #FFE6D5   200 #FFC9AA   300 #FFA474   400 #FF7A3C   500 #F75F14
-         600 #E8490A   700 #C0350B   800 #983010   900 #7A2B11   950 #421105
+paper    canvas #FFFFFF   surface1 #F4F5F8   surface3 #EDEFF4   divider #E1E4EA
+         text1 #08090A    text2 #6B6F76      text3 #8A8F98
+
+purple   base #5E6AD2     pressed #4F58B8    wash-dark #141726  wash-light #E8EAF9
+
+status   amber #F2C94C    red #EB5757        green #4CB782
 ```
 
-The neutral ramp is very slightly cool, so the near-black ground reads as considered rather than as
-an absence of colour. `#000000` is never used as a background.
-
-### Semantic mapping
-
-| Token | Dark (default) | Light |
-| --- | --- | --- |
-| `bg-canvas` | `#0B0C0E` | `neutral-50` |
-| `bg-surface` | `#131417` | `#FFFFFF` |
-| `bg-raised` | `#24262C` | `#FFFFFF` |
-| `fg-default` | `neutral-100` | `neutral-900` |
-| `fg-muted` | `neutral-400` | `neutral-600` |
-| `fg-subtle` | `neutral-500` | `neutral-500` |
-| `border-default` | `neutral-800` | `neutral-200` |
-| `border-strong` | `neutral-600` | `neutral-500` |
-| `accent-fg` (accent text) | `accent-400` | `accent-700` |
-| `accent-fill` (primary button) | `accent-500` | `accent-500` |
-| `on-accent` (label on fill) | `neutral-950` | `neutral-950` |
-| `focus-ring` | `accent-400` | `accent-600` |
-
-Two consequences worth stating because they are easy to get wrong later:
-
-- **The label on an orange fill is near-black, in both themes.** White on orange measures 3.90:1 and
-  fails AA; near-black on `accent-500` measures 6.15:1. There is no theme in which a white-on-orange
-  button is acceptable here.
-- **Elevation reverses between themes.** Dark conveys it by background luminance, because shadows
-  are invisible on a near-black ground. Light inverts it — panels are white on a tinted ground — and
-  raised surfaces separate by border and shadow rather than by luminance. The contrast checker
-  applies the luminance requirement to dark only, deliberately.
+The canvas is `#08090A`, and the source spec is emphatic that this is not negotiable: *"Don't use
+`#121212` — Linear is darker; the near-OLED black is part of the identity."* A test asserts the
+value and asserts `#121212` appears nowhere.
 
 ### Accent discipline
 
-Orange is reserved for **interaction**: primary actions, links, focus, selection, the active
-navigation item, and the current position in a list. It is never used to mean "warning", "urgent" or
-"bad".
+Purple is the only accent. It marks the primary action, the focused command-menu row, the active
+list selection and the active sidebar item, and nothing else. *"When something turns purple, it is
+**the** thing you should act on."*
 
-This matters because `accent-400` and `status-high-400` sit at 1.65:1 relative luminance and are
-both warm — close enough that colour alone cannot separate them. The resolution is role separation,
-not hue tuning: they never appear in the same role, severity always carries an icon and a text
-label, and severity chips use a small coloured dot with neutral text rather than coloured text.
+**The accent is never a text colour.** `#5E6AD2` measures 4.24:1 on the canvas and 3.59:1 on a
+raised row — under the 4.5:1 body-text floor, over the 3:1 floor for a glyph, a ring or a focus
+indicator. That is the only way the source spec ever uses it (*"Active item: label `#F7F8F8`, 16pt
+icon `#5E6AD2`"*), so the token is named `--accent-glyph` to make a text use look wrong at the call
+site, and a test fails if any `--fg-*` token resolves to it. Labels on a purple ground are
+`#FFFFFF`, which measures 4.70:1 and passes — unlike the previous orange accent, where white
+measured 3.90:1 and the label had to be near-black.
 
 ### Status
 
-| Severity | Dark | Light |
+Status is a **drawn glyph language**, not a set of coloured badges. From the source spec, twice:
+*"Use the iconographic status system (drawn glyphs) instead of colored fills or text badges"* and
+*"Don't use colored status badges with text — the drawn icon system **is** the language."*
+
+| Role | Glyph | Colour |
 | --- | --- | --- |
-| critical | `#FF6166` | `#AA2429` |
-| high | `#F2CB3D` | `#856400` |
-| medium | `#5EB1EF` | `#1060A3` |
-| low | `#4CC38A` | `#1B6B48` |
+| `detected` | dashed ring | `--status-neutral` |
+| `triaged` | thin ring | `--status-neutral` |
+| `investigating` | half-filled pie | `--status-progress` |
+| `actioned` | three-quarter pie | `--status-progress` |
+| `validating` | near-full ring | `--status-done` |
+| `resolved` | filled disc with a knocked-out check | `--status-done` |
+| `dismissed` | filled disc with a knocked-out cross | `--status-canceled` |
+
+Severity uses the source spec's **priority bars**: *"Urgent renders as a filled amber/red square
+with `!`; High = 3 filled, Medium = 2, Low = 1, None = 3 dimmed."* Only critical takes a colour;
+high, medium and low are all `--status-neutral` and differ by how many bars are filled. That is
+what makes severity survive greyscale without a coloured chip, and it is why the severity rail and
+the severity chip that preceded it are both gone — accent and severity must not compete for the same
+three pixels of a row's left edge.
 
 ### Rules
 
-- Status is never carried by colour alone. Every status has an icon or a text label, for
-  colour-vision deficiency and for greyscale printing.
-- Contrast: 4.5:1 for body text, 3:1 for large text and non-text UI indicators, in both themes.
-  Verified by the checker, gated in CI.
-- Modelled data uses a distinct, non-decorative treatment — a hatched fill and a `▨` marker — not a
-  different hue, because hue alone is exactly the confusion the brief prohibits.
-- Chart marks come from a dedicated ordered ramp, tested for both themes and for deuteranopia. The
-  accent is not a chart colour; a series must never be mistakable for an interactive element.
-- Never introduce a colour outside these ramps. A one-off hex in a component is a lint error.
-
-### On the Linear reference
-
-The brief takes Linear as an *interaction* reference and explicitly forbids copying its branding or
-colours. This palette is consistent with that: it borrows the character — near-black ground, high
-density, hairline borders, restrained chrome, a single saturated accent doing all the interactive
-work — while the accent itself (orange) is deliberately not Linear's blue-violet.
-
-Prohibited by construction, with lint rules where mechanisable: purple-blue gradients, glass panels,
-glowing borders, giant metric cards, decorative sparkles, random gradient blobs.
+- No second accent. A test enumerates every accent-role token in both themes and fails if one
+  resolves outside the purple family.
+- `#000000` is never a background; `#08090A` is.
+- The label-pill dot colour is workspace data, never UI chrome.
+- Light darkens the status ramp rather than inheriting it. Amber, red and green at their dark values
+  measure 1.46:1, 3.19:1 and 2.29:1 on the light surface — unreadable, and invisible in a dark-mode
+  screenshot. A test fails if a light status token equals its dark counterpart.
 
 ## 3. Typography
 
-One sans family with tabular figures for the product; the marketing surfaces may keep a display
-scale, the signed-in product may not.
+**Inter** at 400 / 500 / 600 and nothing else — *"no light, no bold/black"* — with
+`font-feature-settings: "cv11", "ss03"` and tabular numerals wherever a count or an identifier
+appears. Monospace carries identity, never content: gap references and keyboard shortcuts.
 
-| Token | Size / line | Use |
-| --- | --- | --- |
-| `text-2xs` | 10 / 14 | Dense metadata in rows |
-| `text-xs` | 11 / 16 | Secondary row line, labels |
-| `text-sm` | 13 / 18 | Body default in product |
-| `text-base` | 15 / 22 | Detail prose |
-| `text-lg` | 18 / 24 | Panel titles |
-| `text-xl` | 22 / 28 | Route titles |
-| `text-2xl` | 28 / 34 | Largest permitted in signed-in product |
+| Token | Size / line | Tracking | Use |
+| --- | --- | --- | --- |
+| `text-2xs` | 11 / 1.2 | +0.4 | Uppercase group and section labels, 600 |
+| `text-xs` | 12 / 1.3 | 0 | Meta, counts, label pills, command shortcuts |
+| `text-sm` | 13 / 1.35 | 0 | Metadata, mono gap references |
+| `text-md` | 14 / 1.3 | −0.1 | Command rows, sidebar items, buttons |
+| `text-base` | 15 / 1.35 | −0.1 | Row title at 500; body at 400 with 1.5 line height |
+| `text-lg` | 17 / 1.3 | −0.2 | Section headers, group headers, top-bar title |
+| `text-xl` | 22 / 1.25 | −0.3 | View titles, the detail-route title |
+| `text-2xl` | 28 / 1.2 | −0.4 | The largest step there is |
 
-`font-variant-numeric: tabular-nums` on every numeric cell, so columns align and a changing value
-does not reflow its row. No `clamp()` display headlines inside the product — the legacy
-`clamp(45px, 5.8vw, 74px)` treatment stays in `legacy/` and on marketing routes.
+There is **no display step**, because the product has no marketing surface: *"the issue title is the
+headline"*. Negative tracking is on titles only, easing to 0 at body. Nothing renders below 11px —
+the previous ramp bottomed out at 10px and put 30 of its 42 font-size declarations at 10 or 11.
 
-## 4. Spacing, radius, borders, shadow
+## 4. Spacing, radius, borders, elevation
 
-4 px base scale: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64. Radii 6–10 px only; `999px` reserved for
-avatars and count badges, not for every control. Borders are 1 px hairlines at `--border-default`;
-`--border-strong` for selection. Two shadow tokens only: `--shadow-peek` and `--shadow-menu`.
+4px base. Scale: **4, 6, 8, 12, 16, 20, 24, 32, 40, 56**. Standard margin 16px horizontal on lists.
+Rows touch — *"separation is via hover state and group headers, not gaps"*.
 
-Elevation is theme-dependent, as set out in §2: dark uses background luminance and treats shadow as
-decoration; light uses border and shadow, because a white panel on a tinted ground has nowhere to go
-luminance-wise. Do not implement one mechanism and let the other theme inherit it.
+Radius, exactly five steps: **0** dividers and full-bleed rows · **6px** label pills, icon-button
+hover, dropdown menus · **8px** buttons, inputs, status pills · **12px** the command sheet and
+modals · **50%** avatars only.
 
-Whitespace is used to group, not to fill. A route that shows three numbers in a viewport is a
-failure of density, which is the main design defect carried over from the prototype.
+Elevation is *"a one-step background lift and a precise 1pt border, not blur"*:
+
+| Level | Treatment |
+| --- | --- |
+| Flat | Rows, list canvas, group headers — no shadow |
+| Hover | Background shift to `--bg-raised`, no shadow |
+| Popover | `--shadow-menu` + 1px `--border-default` |
+| Command sheet | `--shadow-peek` + 1px `--border-default` |
+| Scrim | `--scrim` behind the command menu and modals |
+
+Two shadows, both large, dark and soft, and only on floating surfaces. *"Shadows cost compositing
+time and Linear optimizes for instant."*
+
+The contrast gate checks elevation as lift **and** border, in both themes, rather than as a
+luminance threshold alone: on a near-OLED canvas the lift the source palette achieves is 1.18:1, and
+the hairline is what finishes the job. This is a wider check than the dark-only luminance test it
+replaced.
 
 ## 5. Density
 
 | Token | Value | Applies to |
 | --- | --- | --- |
-| `--row-height-compact` | 32 px | Gap inbox default |
-| `--row-height-comfortable` | 44 px | User preference, persisted per user |
-| `--row-height-touch` | 48 px | Frontline surfaces, always |
+| `--row-height-compact` | 44px | The gap inbox default |
+| `--row-height-comfortable` | 52px | Persisted user preference; adds the recommended-action line |
 
-Frontline is touch-first: 48 px minimum targets, 44 px minimum spacing between destructive and
-non-destructive controls.
+Both are the source spec's own row heights. Compact is the default because *"density is the value
+proposition"* and *"Don't pad issue rows for 'breathing room' — that destroys the density that makes
+Linear fast."* The preference is stored in `localStorage`, read through `useSyncExternalStore`, and
+reachable from the toolbar and the command menu.
+
+Frontline is touch-first: 48px minimum targets below 720px, asserted by the capture script, which
+fails the run if any nav item, view tab or severity pill measures under 44px there.
 
 ## 6. Motion
 
-Motion for React, used only where movement explains state or preserves spatial context. Durations
-120–220 ms; peek open/close 180 ms; row selection 120 ms; nothing above 240 ms.
+Durations **90–240ms**, and nothing above it: *"anything over ~250ms feels broken"*.
 
-`prefers-reduced-motion: reduce` replaces transform animations with opacity changes and disables
-layout animation entirely. This is a token-level switch, not a per-component conditional.
+| Token | Duration | Use |
+| --- | --- | --- |
+| `--motion-row` | 90ms | Row selection — a colour cross-fade, no movement |
+| `--motion-command` | 120ms | Command menu, opacity 0→1 with scale 0.96→1 |
+| `--motion-morph` | 150ms | Status glyph state change |
+| `--motion-sidebar` | 220ms | Sidebar slide-over |
+| `--motion-panel` | 240ms | Detail panel push |
 
-No fake live activity. Nothing pulses, shimmers or animates to imply data is arriving when it is not.
+`prefers-reduced-motion: reduce` replaces transform animation with opacity alone and disables layout
+animation, as a token-level switch rather than a per-component conditional.
+
+No fake live activity. Nothing pulses, shimmers or animates to imply data is arriving when it is
+not.
 
 ## 7. Component inventory
 
@@ -220,5 +258,27 @@ Design rules that can be mechanised are:
   minimum. Runs today; moves into `packages/ui` in Phase E.
 - A colour literal outside the token ramps — lint error.
 
-The rest is caught by screenshot review at 1440 × 900, 1024 × 768 and 390 × 844 per route, compared
-against this document by the design-reviewer subagent before a route is marked complete.
+The rest is caught by screenshot review at 1440 × 900, 1024 × 768 and 390 × 844 per route **in both
+themes**, compared against this document by the design-reviewer subagent before a route is marked
+complete. `apps/web/scripts/capture.mjs` produces that set and asserts what does not need an eye: no
+console errors, no horizontal overflow at 390 or 320, no touch target under 44px on the frontline
+mobile surface, the compact row at 44px and the comfortable row at 52px, exactly one focused command
+row, and no currency figure surviving into a frontline payload. It writes nothing if any of those
+fail.
+
+### Deviations from the source spec
+
+Ten, each with a reason. Nothing here is a preference.
+
+| Deviation | Why |
+| --- | --- |
+| Light gets a darkened status ramp | The source ships four light values and no light status ramp. Amber, red and green measure 1.46:1, 3.19:1 and 2.29:1 on the light surface — below AA for text. Each hue is scaled toward black by the smallest factor that clears 4.5:1. |
+| Light divider and pressed step derived | Not in the source spec. Derived to sit between the light canvas and surface, keeping the hairline mechanism the dark theme uses. |
+| `bg-surface` and `bg-raised` are the same value in light | The source light mode has one surface. Selection is carried by the purple wash it does define, and a test asserts the wash differs from both the canvas and the hover ground in both themes. |
+| The selection wash is stored flattened, not as `rgba()` | `rgba(94,106,210,0.14)` over a known ground is a known colour, and a known colour is checkable by the contrast gate. |
+| The row's trailing zone carries exposure and confidence | `gap-model.md` §3 requires them adjacent on every surface. An issue row has no equivalent, and this is the slot the source layout leaves for right-aligned numerics. |
+| The recommended action appears at comfortable density only | It is the row's answer to "so what", and putting it on every row made a three-line row and cost the density the source calls the value proposition. |
+| A situation strip above the list | The source list opens straight onto rows. A gap ledger's first question is "how bad is today", which a list cannot answer — the reason this exists is a user rejecting the bare list outright. It is styled as a caption band at the 17px step, not the 28px one, with no fills, cards or shadow. |
+| Light keeps its own shadow opacity | The source shadows are tuned for a near-black canvas; the same alpha on white reads as dirt. Geometry is unchanged, opacity is reduced. |
+| JetBrains Mono stands in for Berkeley Mono | Berkeley Mono is a paid licence. SF Mono still wins on Apple hardware through the fallback stack the source specifies. |
+| No bottom tab bar, no haptics, no iPad two-pane | This is a web app. The source is an iOS spec; its slide-over sidebar, keyboard model and command menu carry over, its device-specific affordances do not. |

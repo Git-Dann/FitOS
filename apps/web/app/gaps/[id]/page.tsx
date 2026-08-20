@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
-import { ConfidenceMeter, SeverityChip, StatusChip } from "@/components/chips";
+import { ConfidenceMeter, SeverityLabel, StatusLabel } from "@/components/chips";
 import { DEMO_GAPS, hasExposure } from "@/lib/demo-gaps";
 import { age, count, dateTime, humanise, money, ratio } from "@/lib/format";
 
@@ -35,8 +35,8 @@ export default async function GapDetail({ params }: { params: Promise<{ id: stri
         </Link>
 
         <div className="detail-head">
-          <SeverityChip severity={gap.severity} />
-          <StatusChip status={gap.status} />
+          <SeverityLabel severity={gap.severity} />
+          <StatusLabel status={gap.status} />
           <ConfidenceMeter band={gap.confidenceBand} score={gap.confidenceScore} />
           <span className="chip">{gap.gapTypeLabel}</span>
         </div>

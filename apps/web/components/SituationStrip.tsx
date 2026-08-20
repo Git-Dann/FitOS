@@ -23,14 +23,7 @@ import type { Severity } from "@/lib/demo-gaps";
 import { STALE_SECONDS, type SituationSummary } from "@/lib/situation";
 import { age, count, exposureRange } from "@/lib/format";
 import { ModelledKey, ModelledMark } from "./chips";
-
-const SEVERITY_GLYPH: Record<Severity, string> = {
-  critical: "▲",
-  high: "●",
-  medium: "◆",
-  low: "▪",
-  info: "·",
-};
+import { SeverityGlyph } from "./glyphs";
 
 /** The exposure block, with its qualifications inline rather than on hover. */
 function Exposure({ summary }: { summary: SituationSummary }) {
@@ -131,7 +124,7 @@ export function SituationStrip({
               onClick={() => onSeverity(activeSeverity === entry.severity ? null : entry.severity)}
               title={`Show only ${entry.severity} gaps`}
             >
-              <span aria-hidden="true">{SEVERITY_GLYPH[entry.severity]}</span>
+              <SeverityGlyph severity={entry.severity} />
               <span className="tabular">{count(entry.count)}</span>
               <span className="sev-pill-word">{entry.severity}</span>
             </button>

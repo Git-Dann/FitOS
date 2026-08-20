@@ -558,3 +558,78 @@ playbook ids. Two of those seven contract tests failed on first run.
 `accent.` by name, so when the nested status ramps were added the resolver emitted
 `--status-critical: [object Object]` and the test passed. It now asserts every emitted declaration
 is a hex literal, and the mutation that reproduces the original bug fails it.
+
+## Refactor onto Linear's design system (Phase E)
+
+The visual language is now **Linear's iOS design system**, copied from
+`design-md/productivity/linear/DESIGN.md` in
+[Meliwat/awesome-ios-design-md](https://github.com/Meliwat/awesome-ios-design-md).
+
+This reverses a documented decision. `docs/design-system.md` previously said the brief "explicitly
+forbids copying its branding or colours" and that the orange accent was "deliberately not Linear's
+blue-violet". That section is rewritten rather than left contradicting the code — §0 states the
+reversal explicitly so nobody has to work out which of the two the build follows.
+
+### What changed
+
+| Area | Before | Now |
+| --- | --- | --- |
+| Canvas | `#0B0C0E` | `#08090A` — the source spec forbids `#121212` by name and a test asserts it appears nowhere |
+| Accent | Orange `#F75F14`, label near-black | Purple `#5E6AD2`, label `#FFFFFF` (4.70:1) |
+| Severity | Coloured chip, then a coloured row rail | Priority-bar glyph — only critical is coloured; high/medium/low differ by bar count |
+| Status | Chip with a glyph and an uppercase word | Seven drawn SVG glyphs on the backlog→done arc |
+| Row | Three lines, ~56px | 44px single line: status glyph → mono ref → title → scope → age → exposure → confidence → priority → avatar |
+| Density | Fixed | Persisted 44px/52px preference; comfortable adds the recommended-action line |
+| Type | 10–28px, 30 of 42 declarations at 10 or 11px | Inter 400/500/600, 11–28px, eight steps with per-step tracking |
+| Sidebar | 216px rail | 280px, purple wash on the active item, no tab bar |
+| Command menu | Did not exist | ⌘K: 560px sheet, fuzzy subsequence match, arrow keys, purple focus wash, Esc dismisses |
+| Motion | None | 90–240ms, reduced-motion switch at the token level |
+| Confidence | Four 5px pips | 32px segmented track plus the band word |
+
+### The guard the palette swap needed
+
+`--on-accent` was near-black because white on the old orange measured 3.90:1 and failed AA. White on
+Linear's purple measures 4.70:1 and passes. Swapping an accent without revisiting the label colour is
+exactly the change that silently breaks contrast, so a test now asserts white in both themes.
+
+The inverse also holds and is the more interesting finding: **the source palette is internally
+AA-safe only because Linear never sets text in its accent colour.** `#5E6AD2` is 4.24:1 on the canvas
+and 3.59:1 on a raised row — under the body-text floor, over the 3:1 glyph floor, which is the only
+way the spec ever uses it ("Active item: label `#F7F8F8`, 16pt icon `#5E6AD2`"). The token is
+therefore named `--accent-glyph`, the contrast suite checks it as a non-text indicator, and a test
+fails if any `--fg-*` token resolves to it.
+
+Seven token guards were mutation-checked: canvas drifting back to `#121212`, a second accent hue,
+`on-accent` reverting to near-black, the accent used as text, the selection wash colliding with the
+hover ground, light inheriting the dark status ramp, and the severity rainbow returning. Each fails
+exactly the assertion that names it.
+
+### Bugs this pass produced and caught
+
+- **`if (!open) return` after `open` stopped being a prop.** The identifier resolved to
+  `window.open` — a function, therefore always truthy — so the guard silently did nothing and
+  TypeScript had no complaint. A leftover name that still resolves is the worst kind.
+- **`resolveRef` could not reach a three-segment token.** It split on one dot, so the nested status
+  ramps emitted `--status-critical: [object Object]` and the test that should have caught it matched
+  only `neutral.` and `accent.` by name. It now asserts every declaration is a hex literal.
+- **Two light-theme pairs failed AA** on a "raised" step that was invented rather than taken from
+  the spec. Linear's light mode has one surface; selection is carried by the purple wash it does
+  define, and a test asserts the wash differs from both the canvas and the hover ground.
+- **The capture script caught four touch targets under 44px and 275px of horizontal overflow** at
+  390px during the pass, and refused to write screenshots until they were fixed.
+
+### Deviations
+
+Ten, tabulated in `docs/design-system.md` §10 with a reason each, and the machine-checkable ones
+recorded in `$deviations` in `tokens.json`. The two that outrank the source spec are WCAG 2.2 AA —
+which the source document does not commit to and which is not relaxed to match a value — and
+`gap-model.md` §3, which requires exposure to travel with its confidence band on every surface and
+so adds two values to the row's trailing zone that an issue row has no need of.
+
+### Still owed
+
+Unchanged from the previous review, minus the confidence meter and the density preference, which are
+now done: loading/delayed/partial/no-data states, the Radix `Select` primitive (role switching moved
+into the command menu but owner and dismissal-reason are still native selects), the metrics route as
+a table, `⤢ Open` from peek to detail plus actions on the detail route, and the §10 lint rule
+forbidding tier-1 token references in components — the violations are gone, the guard is not built.

@@ -32,8 +32,8 @@ const PRIMARY: NavEntry[] = [
 function NavItem({ entry }: { entry: NavEntry }) {
   const content = (
     <>
-      <span>
-        <span aria-hidden="true" style={{ marginRight: 8 }}>
+      <span className="nav-item-main">
+        <span className="nav-glyph" aria-hidden="true">
           {entry.glyph}
         </span>
         <span className="nav-label">{entry.label}</span>
@@ -57,6 +57,7 @@ function NavItem({ entry }: { entry: NavEntry }) {
 }
 
 export function AppShell({
+  className,
   title,
   meta,
   current = "/",
@@ -67,6 +68,8 @@ export function AppShell({
   title: string;
   meta: string;
   current?: string;
+  /** Scopes the density preference, so the rows and the switch cannot disagree. */
+  className?: string;
   /**
    * The live open-gap count, or undefined on a route that does not know it.
    *
@@ -83,7 +86,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className="shell">
+    <div className={className ? `shell ${className}` : "shell"}>
       <nav className="nav" aria-label="Primary">
         <div className="nav-brand">
           <span className="nav-mark" aria-hidden="true">

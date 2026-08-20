@@ -10,53 +10,42 @@
  * §2 (accent discipline) — accent is reserved for interaction. Severity uses
  * the status ramp; nothing here borrows accent to look urgent.
  *
- * §2 again, and this one was got wrong first time round: "severity chips use a
- * small coloured dot with neutral text rather than coloured text". Colouring
- * the label put a red word a few pixels from an orange selection bar, which is
- * the collision the rule exists to prevent. The colour now lives in a 6px dot
- * and the word is neutral.
+ * The chip-with-a-word treatment is gone entirely. The source design system
+ * says it twice — "Use the iconographic status system (drawn glyphs) instead of
+ * colored fills or text badges" and "Don't use colored status badges with text
+ * — the drawn icon system *is* the language" — and it is right for a reason
+ * beyond taste: a chip spent about 60px of row width restating what a 16px
+ * glyph says, on the component most of the pixels go to. The glyphs live in
+ * `glyphs.tsx`; what is left here is exposure and confidence.
  */
 import { hasExposure } from "@/lib/demo-gaps";
+import { SeverityGlyph, StatusGlyph } from "./glyphs";
 import type { ConfidenceBand, DemoGap, GapStatus, Severity } from "@/lib/demo-gaps";
 import { exposureRange, money } from "@/lib/format";
 
-const SEVERITY_GLYPH: Record<Severity, string> = {
-  critical: "▲",
-  high: "●",
-  medium: "◆",
-  low: "▪",
-  info: "·",
-};
-
-export function SeverityChip({ severity }: { severity: Severity }) {
+/**
+ * A drawn glyph plus a neutral word, for surfaces that have room to name the
+ * state — the peek header and the detail route.
+ *
+ * §7: "Don't use colored status badges with text — the drawn icon system *is*
+ * the language." So this is not a chip: no border, no fill, no uppercase, no
+ * coloured label. The glyph carries the state and the word names it, which is
+ * also what keeps the pair legible in greyscale (§9).
+ */
+export function StatusLabel({ status }: { status: GapStatus }) {
   return (
-    <span className={`chip chip-severity chip-${severity}`}>
-      <span className="chip-dot" aria-hidden="true" />
-      <span className="chip-glyph" aria-hidden="true">
-        {SEVERITY_GLYPH[severity]}
-      </span>
-      {severity}
+    <span className="state-label">
+      <StatusGlyph status={status} />
+      {status}
     </span>
   );
 }
 
-const STATUS_GLYPH: Record<GapStatus, string> = {
-  detected: "◌",
-  triaged: "◔",
-  investigating: "◑",
-  actioned: "◕",
-  validating: "◕",
-  resolved: "●",
-  dismissed: "✕",
-};
-
-export function StatusChip({ status }: { status: GapStatus }) {
+export function SeverityLabel({ severity }: { severity: Severity }) {
   return (
-    <span className="chip">
-      <span className="chip-glyph" aria-hidden="true">
-        {STATUS_GLYPH[status]}
-      </span>
-      {status}
+    <span className="state-label">
+      <SeverityGlyph severity={severity} />
+      {severity}
     </span>
   );
 }
@@ -70,15 +59,15 @@ export function StatusChip({ status }: { status: GapStatus }) {
  * component breakdown.
  */
 export function ConfidenceMeter({ band, score }: { band: ConfidenceBand; score: number }) {
-  const filled = Math.max(1, Math.min(4, Math.round(score * 4)));
   return (
-    <span className="confidence" title={`Confidence ${band} (${score.toFixed(3)})`}>
-      <span className="confidence-pips" aria-hidden="true">
-        {[0, 1, 2, 3].map((index) => (
-          <i key={index} className={index < filled ? "pip pip-on" : "pip"} />
-        ))}
+    <span
+      className={`confidence confidence-${band}`}
+      title={`Confidence ${band} (${score.toFixed(3)})`}
+    >
+      <span className="confidence-track" aria-hidden="true">
+        <span className="confidence-fill" style={{ width: `${Math.round(score * 100)}%` }} />
       </span>
-      <span>{band}</span>
+      <span className="confidence-band">{band}</span>
     </span>
   );
 }

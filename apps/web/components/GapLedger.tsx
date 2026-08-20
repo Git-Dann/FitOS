@@ -21,9 +21,11 @@ import type { DemoGap, Severity } from "@/lib/demo-gaps";
 import { groupBySeverity } from "@/lib/demo-gaps";
 import { PeekPanel } from "./PeekPanel";
 import { GapRow } from "./GapRow";
+import type { Density } from "@/lib/density";
 import { count, exposureRange } from "@/lib/format";
 import { summarise } from "@/lib/situation";
 import { ModelledMark } from "./chips";
+import { SeverityGlyph } from "./glyphs";
 import type { AuditEntry } from "@/lib/ledger-state";
 import type { TransitionRequest } from "./TransitionControls";
 
@@ -46,7 +48,7 @@ function GroupHeader({ severity, gaps }: { severity: Severity; gaps: DemoGap[] }
   const { exposure } = summarise(gaps);
   return (
     <h2 className={`group-header group-header-${severity}`}>
-      <span className="group-header-dot" aria-hidden="true" />
+      <SeverityGlyph severity={severity} />
       <span className="group-header-word">{severity}</span>
       <span className="group-header-count tabular">{count(gaps.length)}</span>
       {exposure.kind === "range" ? (
@@ -73,12 +75,14 @@ function GroupHeader({ severity, gaps }: { severity: Severity; gaps: DemoGap[] }
 export function GapLedger({
   gaps,
   capabilities,
+  density,
   audit,
   onAssign,
   onTransition,
 }: {
   gaps: DemoGap[];
   capabilities: readonly string[];
+  density: Density;
   audit: Record<string, AuditEntry[]>;
   onAssign: (gapId: string, owner: string | null) => void;
   onTransition: (gapId: string, request: TransitionRequest) => void;
@@ -168,6 +172,7 @@ export function GapLedger({
                 <li key={gap.id}>
                   <GapRow
                     gap={gap}
+                    density={density}
                     active={index === activeIndex}
                     onActivate={() => {
                       setActiveIndex(index);

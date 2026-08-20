@@ -46,6 +46,17 @@ const ROUTES = [
 
 const failures = [];
 
+/** Drives the command menu, which is now the only way to change role. */
+async function selectRole(page, role) {
+  await page.keyboard.press("Control+k");
+  await page.waitForSelector(".command", { state: "visible" });
+  await page.fill(".command-input", `act as ${role}`);
+  await page.waitForTimeout(60);
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".command", { state: "detached" });
+  await page.waitForTimeout(120);
+}
+
 await mkdir(outDir, { recursive: true });
 const browser = await chromium.launch();
 
@@ -112,8 +123,7 @@ for (const route of ROUTES) {
   const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark", {
     deviceScaleFactor: 2,
   });
-  await page.selectOption("#role", "frontline");
-  await page.waitForTimeout(120);
+  await selectRole(page, "frontline");
   const text = await page.textContent("body");
   if (!text?.includes("withheld"))
     failures.push("frontline: exposure was not reported as withheld");
@@ -133,14 +143,57 @@ for (const route of ROUTES) {
   await page.close();
 }
 
+// The command menu, which the source spec calls the soul of the app.
+{
+  const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark", {
+    deviceScaleFactor: 2,
+  });
+  await page.keyboard.press("Control+k");
+  await page.waitForSelector(".command", { state: "visible" });
+  await page.keyboard.press("ArrowDown");
+  await page.waitForTimeout(160);
+  const focused = await page.locator('.command-row[aria-selected="true"]').count();
+  if (focused !== 1) failures.push(`command menu: ${focused} focused rows, expected exactly 1`);
+  await page.screenshot({ path: path.join(outDir, "command-menu-1440x900.png") });
+  await page.close();
+}
+
+// Comfortable density, which is the only place the recommended action shows.
+{
+  const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark", {
+    deviceScaleFactor: 2,
+  });
+  await page.click('.density-switch button:has-text("comfortable")');
+  await page.waitForTimeout(160);
+  const rows = page.locator(".gap-row");
+  const box = await rows.first().boundingBox();
+  // 52px per the spec, allowing for the sub-pixel rounding of a border.
+  if (!box || box.height < 50) {
+    failures.push(`comfortable density: row is ${box?.height ?? "?"}px, expected >= 50`);
+  }
+  const actions = await page.locator(".gap-action-title").count();
+  if (actions === 0) failures.push("comfortable density: no recommended action rendered");
+  await page.screenshot({ path: path.join(outDir, "density-comfortable-1440x900.png") });
+  await page.close();
+}
+
+// Compact is the default, and its row must be the spec's 44px.
+{
+  const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark");
+  const box = await page.locator(".gap-row").first().boundingBox();
+  if (!box || box.height < 43 || box.height > 46) {
+    failures.push(`compact density: row is ${box?.height ?? "?"}px, expected 44`);
+  }
+  await page.close();
+}
+
 // Frontline at 390: the one combination where §5's 48px touch rule binds, and
 // the one nobody had captured.
 {
   const page = await open(browser, base + "/", { width: 390, height: 844 }, "dark", {
     deviceScaleFactor: 2,
   });
-  await page.selectOption("#role", "frontline");
-  await page.waitForTimeout(120);
+  await selectRole(page, "frontline");
   const small = await page.evaluate(() =>
     [...document.querySelectorAll(".nav-item, .sev-pill, .view-tab")]
       .filter((el) => el.getBoundingClientRect().height < 44)

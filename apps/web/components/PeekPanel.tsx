@@ -15,7 +15,7 @@
  */
 import { hasExposure } from "@/lib/demo-gaps";
 import type { DemoGap } from "@/lib/demo-gaps";
-import { ConfidenceMeter, ExposureBase, SeverityChip, StatusChip } from "./chips";
+import { ConfidenceMeter, ExposureBase, SeverityLabel, StatusLabel } from "./chips";
 import { age, count, dateTime, humanise, money, ratio } from "@/lib/format";
 import { TransitionControls, type TransitionRequest } from "./TransitionControls";
 import type { AuditEntry } from "@/lib/ledger-state";
@@ -48,8 +48,8 @@ export function PeekPanel({
       <div className="peek-header">
         <div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-            <SeverityChip severity={gap.severity} />
-            <StatusChip status={gap.status} />
+            <SeverityLabel severity={gap.severity} />
+            <StatusLabel status={gap.status} />
             <span className="gap-ref">{gap.reference}</span>
           </div>
           <h2 className="peek-title">{gap.title}</h2>
