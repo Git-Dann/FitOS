@@ -633,3 +633,44 @@ now done: loading/delayed/partial/no-data states, the Radix `Select` primitive (
 into the command menu but owner and dismissal-reason are still native selects), the metrics route as
 a table, `⤢ Open` from peek to detail plus actions on the detail route, and the §10 lint rule
 forbidding tier-1 token references in components — the violations are gone, the guard is not built.
+
+## Regressions the Linear refactor shipped, and the guards that now catch them
+
+Found by reading the CSS the production deployment was actually serving, rather
+than the CSS in the working tree. All four were silent: the build passed, the tests
+passed, `pnpm verify` passed, and the reflow assertion passed.
+
+| Regression | Symptom | Why nothing caught it |
+| --- | --- | --- |
+| Twelve `var()` references to `--status-{critical,high,medium,low}` survived the palette swap | Every connector-state dot on `/sources` lost its colour, and so did the dismissal refusal message and the invalid-textarea border — the exact error state a design review had already flagged for being invisible | A `var()` pointing at nothing is not a CSS error. The declaration is dropped and the property inherits |
+| The `@media (max-width: 720px)` block still reshaped the pre-refactor three-line row | Nine children poured into two grid tracks; the row was scrambled on every phone | The page did not scroll sideways, so the §9 reflow check passed. The layout was wrong, not overflowing |
+| `.mono` was declared twice | The later rule won, replacing the loaded mono face with the system stack and shrinking every gap reference from 13px to 11px subtle grey | A duplicated class is not a conflict CSS reports |
+| `.peek-grid`'s fixed 92px label column on `/metrics` | 15px of horizontal overflow at 320px | The route had never been checked at 320px — only the inbox was |
+
+### Guards added, each mutation-checked
+
+`apps/web/lib/stylesheet.test.ts` reads the real `globals.css` and the real
+generated `tokens.css` and asserts: every custom property referenced is defined
+somewhere (with `--font-sans`/`--font-mono` allowlisted, since `next/font`
+supplies them at runtime); no selector survives for an element the markup no
+longer renders; the typeface class is declared once; no colour literal appears
+outside the token files, which is the §10 lint rule stated as a test until the
+lint rule exists; and no motion token exceeds the source spec's 240ms ceiling.
+Comments are stripped before scanning, because the comments quote the spec's hex
+values.
+
+`apps/web/scripts/capture.mjs` now asserts the mobile row's geometry rather than
+only the absence of overflow: no two visible children of a row may overlap, and
+the title may not collapse below 140px. Counting children against grid tracks was
+the first attempt and was wrong — a grid legitimately flows onto implicit rows,
+which is what the exposure and confidence values are meant to do at that width.
+Overlap is the invariant that actually distinguishes the broken layout.
+
+`apps/web/eslint.config.mjs` adds `no-restricted-globals` over the browser
+globals whose names collide with ordinary locals — `open`, `name`, `status`,
+`length`, `closed`, `event` and fifteen more. This is the guard for the
+`if (!open) return` bug: `CommandMenu` lost its `open` prop, two guards kept
+referencing the name, it resolved to `window.open` — a function, therefore always
+truthy — and both guards silently did nothing. Reintroducing that line now fails
+lint while **still passing `tsc --noEmit`**, which is the evidence that types were
+never going to catch it.

@@ -891,6 +891,20 @@ kbd {
   margin: 0;
 }
 
+/* A fixed 92px label column plus content does not fit a 320px viewport once the
+   page and card padding are taken out, so below that the pairs stack. §9
+   requires reflow to a 320px equivalent, and the metrics route is the only
+   place this grid is used outside the peek — which is always full-width. */
+@media (max-width: 480px) {
+  .peek-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+  .peek-grid dd {
+    margin-bottom: var(--space-1);
+  }
+}
+
 .exposure-bar {
   position: relative;
   height: 4px;
@@ -936,8 +950,12 @@ kbd {
   flex: 1;
 }
 
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+/* This used to be a second `.mono` rule. Being later in the file it won, which
+   replaced the loaded mono face with the system stack and shrank every gap
+   reference in the ledger to 11px subtle grey — where the source spec puts the
+   row identifier at 13pt w500. Size and colour belong to the peek's metadata,
+   not to the class that selects the typeface. */
+.mono-meta {
   font-size: var(--text-2xs);
   color: var(--fg-subtle);
 }
@@ -996,28 +1014,36 @@ kbd {
   .peek {
     width: 100vw;
   }
-  /* Below this width the figures cannot hold their own column without
-     squeezing the title to nothing, so they move under it and left-align. */
+
+  /* The row is nine columns at desktop width and cannot be at 390px. This block
+     used to collapse it to `3px minmax(0, 1fr)` — geometry left over from the
+     three-line row that preceded the Linear refactor — so nine children were
+     poured into two tracks and the layout was scrambled on every phone. The
+     reflow assertion did not catch it because the page still did not scroll
+     sideways: it was wrong, not overflowing.
+
+     What a phone keeps is what the source spec's row leads with — status glyph,
+     identifier, title — plus the two figures that decide whether a gap is worth
+     opening. Scope, age and the avatar are in the peek. */
   .gap-row {
-    grid-template-columns: 3px minmax(0, 1fr);
+    grid-template-columns: 16px auto minmax(0, 1fr) 14px;
+    row-gap: 2px;
+    padding: var(--space-1-5) var(--gutter);
+    align-items: center;
   }
-  .gap-side {
-    grid-column: 2;
-    align-items: flex-start;
-    text-align: left;
-    margin-top: 7px;
-  }
-  .gap-action-rationale {
+  .gap-scope,
+  .gap-age,
+  .avatar {
     display: none;
   }
-  /* The action title is a sentence, so on a phone it wraps rather than being
-     forced onto one line and pushing the document sideways. */
-  .gap-action-title {
-    white-space: normal;
+  .gap-exposure {
+    grid-column: 3 / 4;
+    text-align: left;
+    font-size: var(--text-xs);
   }
-  /* The title said what the problem was and was the only thing truncated,
-     while the metadata below it wrapped freely to three lines. Two lines of
-     title, and the low-value metadata goes to the peek instead. */
+  .confidence {
+    grid-column: 3 / 5;
+  }
   .gap-title {
     white-space: normal;
     display: -webkit-box;
@@ -1025,39 +1051,34 @@ kbd {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  .gap-meta-secondary {
+  .gap-action-rationale {
     display: none;
   }
-  /* §5: 48px minimum targets on a touch surface. The rail was giving them 28,
-     the severity pills 24 and the view tabs 25 — all of them under even the
-     44px WCAG floor, on the one surface the rule actually governs. */
+  .gap-action-title {
+    white-space: normal;
+  }
+
+  /* §5: 48px minimum targets on a touch surface. */
   .nav-item,
   .sev-pill,
   .view-tab,
   .theme-toggle,
   .filter-clear,
+  .command-trigger,
   .control {
     min-height: 48px;
   }
   .sev-pill,
   .view-tab {
-    padding: 0 12px;
-  }
-  .topbar h1 {
-    font-size: var(--text-lg);
+    padding: 0 var(--space-3);
   }
 }
 
-/* A grid item defaults to `min-width: auto`, which means a nowrap child can
-   push the column wider than its track instead of being truncated. Without
-   this the ledger scrolls sideways on a phone, which fails the 320px reflow
-   requirement in §9 — and it fails silently, because it looks fine on a
-   desktop. */
 .shell > main {
   min-width: 0;
 }
 
-.gap-main,
+.gap-body,
 .gap-title,
 .gap-action {
   min-width: 0;
@@ -1255,25 +1276,19 @@ textarea.control {
 
 /* Source state uses the same status ramp as severity and the same dot-plus-word
    treatment — `fixture` must be legible as "not connected", not as a colour. */
-.chip-source-healthy {
-  border-color: var(--status-low-border);
-}
+/* These referenced `--status-low`, `--status-high` and `--status-critical`,
+   which were deleted with the old palette — so every source dot shipped with no
+   colour at all, falling back to the inherited value. The semantic roles are
+   what they should have pointed at from the start. */
 .chip-source-healthy .chip-dot {
-  background: var(--status-low);
+  background: var(--success);
 }
 .chip-source-degraded .chip-dot,
 .chip-source-stale .chip-dot {
-  background: var(--status-high);
-}
-.chip-source-degraded,
-.chip-source-stale {
-  border-color: var(--status-high-border);
-}
-.chip-source-failing {
-  border-color: var(--status-critical-border);
+  background: var(--warning);
 }
 .chip-source-failing .chip-dot {
-  background: var(--status-critical);
+  background: var(--error);
 }
 
 /* --- metrics -------------------------------------------------------------- */
@@ -1415,27 +1430,6 @@ textarea.control {
 
 /* --- group header extras -------------------------------------------------- */
 
-.group-header-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--border-strong);
-  flex: none;
-}
-
-.group-header-critical .group-header-dot {
-  background: var(--status-critical);
-}
-.group-header-high .group-header-dot {
-  background: var(--status-high);
-}
-.group-header-medium .group-header-dot {
-  background: var(--status-medium);
-}
-.group-header-low .group-header-dot {
-  background: var(--status-low);
-}
-
 .group-header-exposure {
   color: var(--fg-muted);
   letter-spacing: 0;
@@ -1477,12 +1471,12 @@ textarea.control {
   gap: 6px;
   margin: 2px 0 0;
   font-size: var(--text-xs);
-  color: var(--status-critical);
+  color: var(--error);
   font-weight: 500;
 }
 
 textarea.control[aria-invalid="true"] {
-  border-color: var(--status-critical);
+  border-color: var(--error);
 }
 
 /* §2: accent is reserved for interaction — and no control in the product was

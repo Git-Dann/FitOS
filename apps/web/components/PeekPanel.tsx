@@ -85,7 +85,7 @@ export function PeekPanel({
           <dd>{dateTime(gap.asOfAt)}</dd>
           <dt>Scope</dt>
           <dd>
-            {gap.scopeId} <span className="mono">({gap.scopeType})</span>
+            {gap.scopeId} <span className="mono mono-meta">({gap.scopeType})</span>
           </dd>
         </dl>
       </section>
@@ -109,7 +109,7 @@ export function PeekPanel({
           </div>
           <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center" }}>
             <ConfidenceMeter band={gap.confidenceBand} score={gap.confidenceScore} />
-            {gap.formulaLabel ? <span className="mono">{gap.formulaLabel}</span> : null}
+            {gap.formulaLabel ? <span className="mono mono-meta">{gap.formulaLabel}</span> : null}
           </div>
           <div style={{ marginTop: 10 }}>
             {/* Every input is listed, observed ones included. "This was measured
@@ -119,7 +119,7 @@ export function PeekPanel({
             {gap.assumptions.map((assumption) => (
               <div key={assumption.key} className="assumption">
                 <b>{assumption.key}</b> · {assumption.statement}
-                <div className="mono">
+                <div className="mono mono-meta">
                   {assumption.value} · {assumption.kind} · {assumption.source}
                 </div>
               </div>
@@ -169,19 +169,19 @@ export function PeekPanel({
           <div key={`${ref.canonicalEntity}-${ref.queryHash}`} className="evidence-item">
             <span className="grow">
               {ref.canonicalEntity}
-              <div className="mono">
+              <div className="mono mono-meta">
                 {ref.sourceLabel} · {count(ref.rowCount)} rows · {ref.sensitivity}
               </div>
             </span>
-            <span className="mono">{ref.queryHash}</span>
+            <span className="mono mono-meta">{ref.queryHash}</span>
           </div>
         ))}
         <div className="evidence-item">
           <span className="grow">
-            <div className="mono">
+            <div className="mono mono-meta">
               metric: {gap.metricKey} v{gap.metricVersion}
             </div>
-            <div className="mono">
+            <div className="mono mono-meta">
               detector: {gap.ruleKey} v{gap.ruleVersion}
             </div>
           </span>
@@ -216,12 +216,12 @@ export function PeekPanel({
             <div key={index} className="evidence-item">
               <span className="grow">
                 {entry.action}
-                <div className="mono">
+                <div className="mono mono-meta">
                   {entry.before} → {entry.after}
                   {entry.reason ? ` · ${entry.reason}` : ""}
                 </div>
               </span>
-              <span className="mono">{entry.actor}</span>
+              <span className="mono mono-meta">{entry.actor}</span>
             </div>
           ))}
         </section>

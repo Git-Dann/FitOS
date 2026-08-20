@@ -187,6 +187,65 @@ for (const route of ROUTES) {
   await page.close();
 }
 
+// The row's geometry at phone width. This is the assertion the previous build
+// needed and did not have: the mobile block still reshaped the three-line row
+// that preceded the Linear refactor, so nine children were being laid into two
+// tracks. Nothing overflowed, so nothing failed.
+{
+  const page = await open(browser, base + "/", { width: 390, height: 844 }, "dark");
+  const row = await page.evaluate(() => {
+    const el = document.querySelector(".gap-row");
+    if (!el) return null;
+    const style = getComputedStyle(el);
+    const box = el.getBoundingClientRect();
+    const title = el.querySelector(".gap-title");
+    return {
+      tracks: style.gridTemplateColumns.split(" ").length,
+      children: el.children.length,
+      height: Math.round(box.height),
+      right: Math.round(box.right),
+      titleWidth: title ? Math.round(title.getBoundingClientRect().width) : 0,
+    };
+  });
+  if (!row) failures.push("mobile row: no .gap-row found");
+  else {
+    // Counting children against tracks is the wrong test: a grid legitimately
+    // flows onto implicit rows, which is exactly what the exposure and
+    // confidence values are meant to do at this width. What actually goes wrong
+    // when children outnumber their tracks is that boxes land on top of each
+    // other, so overlap is the invariant worth asserting.
+    const overlaps = await page.evaluate(() => {
+      const visible = [...document.querySelector(".gap-row").children]
+        .filter((child) => getComputedStyle(child).display !== "none")
+        .map((child) => ({
+          name: child.className || child.tagName,
+          box: child.getBoundingClientRect(),
+        }));
+      const hits = [];
+      for (let a = 0; a < visible.length; a += 1) {
+        for (let b = a + 1; b < visible.length; b += 1) {
+          const one = visible[a].box;
+          const two = visible[b].box;
+          const horizontal = one.left < two.right - 1 && two.left < one.right - 1;
+          const vertical = one.top < two.bottom - 1 && two.top < one.bottom - 1;
+          if (horizontal && vertical) hits.push(`${visible[a].name} / ${visible[b].name}`);
+        }
+      }
+      return hits;
+    });
+    if (overlaps.length > 0) {
+      failures.push(`mobile row: overlapping children — ${overlaps.join(", ")}`);
+    }
+    // The title is the field that says what the problem is. If it has collapsed
+    // to nothing, the row is useless whatever else fits.
+    if (row.titleWidth < 140) {
+      failures.push(`mobile row: title is ${row.titleWidth}px wide, expected >= 140`);
+    }
+    if (row.right > 390) failures.push(`mobile row: extends to ${row.right}px`);
+  }
+  await page.close();
+}
+
 // Frontline at 390: the one combination where §5's 48px touch rule binds, and
 // the one nobody had captured.
 {
