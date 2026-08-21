@@ -297,3 +297,32 @@ unchanged if implementation risk is dropped from the table entirely (A 58, B 37,
 A chat-first home screen, a metric-card landing page, and any shell whose default view is a chart.
 All three were considered and none answers "what should I do next", which is the only question the
 signed-in home is allowed to answer.
+
+
+## Decision revisited — Concept B ships as the signed-in home
+
+The original decision selected Concept A (Gap Ledger) as the home and set the
+others aside. That is reversed: **Concept B, the Operations Radar, is now the
+route at `/`**, and Concept A lives at `/inbox`.
+
+The reason is user feedback, twice, on the built article: a list of gaps did not
+answer the question the reader had on landing. Concept A's own scoring predicted
+that — `manager ●● · presenter ○` against Concept B's `manager ●●● ·
+presenter ●●●` — and its Risks section said it outright: *"It is weakest at
+'what is happening in my store right now', which is the manager's actual first
+question. A list of issues is also the least impressive thing to put on a screen
+in a first demo."*
+
+Both concepts now exist because Concept B's risks are equally explicit that it
+cannot replace the ledger: *"Triage does not scale: at 10,000 gaps the radar is
+decoration."* The two answer different questions and the nav says which is which.
+
+### How Concept B's stated risks are held off
+
+| Risk, verbatim | What the build does |
+| --- | --- |
+| "Heat grids invite pattern-matching without evidence, which is the exact failure mode this product exists to prevent." | A cell carries a *pressure band*, never a metric value and never a direction of causation. Every cell is a real link into the gap that owns it, so the evidence is one click from the pattern. A fixture test asserts every cell is one of four documented bands, so a quantity cannot enter. |
+| "There is no obvious home for confidence or exposure ranges — a coloured cell has no room for '±'." | The grid carries neither. A second panel does nothing else: ranges on a shared currency axis, ranked by the top of each range, with the confidence band on every row and the modelled mark before every modelled figure. |
+| "Triage does not scale: at 10,000 gaps the radar is decoration." | Triage stays in the ledger at `/inbox`, keyboard-first, and the radar links into it. |
+| "It also drifts toward the 'generic BI dashboard' the brief prohibits, and the pull is strong." | Every panel goes through `ChartFrame`, whose scale, source, as-of time, accessible summary and data table are **required props** — a chart without provenance does not compile. The capture script then asserts none of them is present-but-empty. |
+| "Naturally surfaces data-quality holes as visible gaps in the grid rather than as an absence of rows." | This one is an advantage, and it is the reason the grid earns its place. `null` renders as a hatched, marked cell. Tests assert the fixture contains a fully-unknown row, a partially-unknown row, and at least one unknown cell — a fixture where every hour reported could not detect a build that draws "no reading" as "normal". |

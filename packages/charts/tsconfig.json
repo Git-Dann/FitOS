@@ -1,0 +1,10 @@
+{
+  "extends": "@fitos/config/tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // Node's --experimental-strip-types requires explicit .ts specifiers,
+    // which is how the unit tests import the module under test.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*.ts"]
+}

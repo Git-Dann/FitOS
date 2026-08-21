@@ -1,0 +1,21 @@
+{
+  "name": "@fitos/charts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/scale.ts",
+  "types": "./src/scale.ts",
+  "exports": {
+    ".": "./src/scale.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --test --experimental-strip-types src/*.test.ts",
+    "test": "pnpm test:unit"
+  },
+  "devDependencies": {
+    "@fitos/config": "workspace:*",
+    "typescript": "5.9.3",
+    "@types/node": "22.19.19"
+  }
+}

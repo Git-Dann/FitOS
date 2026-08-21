@@ -674,3 +674,61 @@ referencing the name, it resolved to `window.open` — a function, therefore alw
 truthy — and both guards silently did nothing. Reintroducing that line now fails
 lint while **still passing `tsc --noEmit`**, which is the evidence that types were
 never going to catch it.
+
+## Operations Radar — Concept B as the signed-in home (Phase E)
+
+The ledger was rejected as the home on the built article, twice, in the same
+words: it does not answer the question a reader has on landing. So `/` is now
+**Concept B, the Operations Radar** — a documented concept in
+`docs/design-concepts.md`, scored `manager ●●● · presenter ●●●` there against
+Concept A's `manager ●● · presenter ○`. Concept A moves to `/inbox` and keeps
+triage, because Concept B's own risks say a grid cannot do that job.
+
+This reverses the recorded decision, and `docs/design-concepts.md` now carries a
+"Decision revisited" section rather than a stale one. It also softens the
+brief's "not a BI dashboard" line, which is the reversal the user asked for
+explicitly.
+
+### What shipped
+
+| Panel | What it answers | How it stays honest |
+| --- | --- | --- |
+| Pressure by scope and hour | Where is it hurting, and when | A cell is a *band*, never a value and never a cause. Every cell links to its gap's evidence. `null` renders hatched — an hour that did not report and an hour that was quiet never look alike |
+| Open gaps by estimated exposure | What it costs | Ranges on a shared currency axis with real ticks, ranked by the top of each range because the worst case is what a decision is made against. Confidence on every row, modelled mark before every modelled figure, unpriced gaps named rather than dropped |
+| Channels | Which surface is moving | Each reading cites its governed metric key. A channel whose own inputs are broken draws **no line** rather than a flat one, and a `null` delta reads "no comparison" rather than "flat" |
+
+### The guard that made §7 real
+
+`docs/design-system.md` §7 requires six things of every chart and calls it "the
+single most-violated rule in the legacy prototype". A rule broken that often is
+a rule the code makes easy to break, so `ChartFrame` takes `scaleLabel`,
+`source`, `asOf`, `summary` and `table` as **required props** — a chart with no
+provenance does not compile. The capture script then closes the remaining hole,
+because an empty string satisfies TypeScript and is as useless as nothing: it
+asserts each chart has a title, a scale of real length, a summary over 40
+characters, an "as of" in its provenance line, and at least one table row.
+
+`packages/charts` holds the scale maths as pure functions with no React and no
+DOM — `linearScale`, `bandScale`, `niceTicks`, `linePath`, `bandPath`, 15 tests.
+A wrong scale is invisible: a bar at 61% of its track when it should be at 67%
+still looks like a bar. The React frame stays in the app, because the maths is
+the reusable half and the half worth testing hard.
+
+### Two bugs the tests caught, both invisible on screen
+
+**`niceTicks(0, 47)` returned `[0,10,20,30,40]`** — the axis stopped before the
+data, so the tallest bar would have appeared off-scale. Found by the assertion
+that ticks must span the domain, not by looking at a chart.
+
+**A channel was flagged unreliable for measuring something broken.** `Loyalty`
+completeness reads 41% *because* a feed is short — the metric is doing its job,
+and suppressing its series would have hidden the outage rather than reported it.
+That is a different state from `Stores`, whose denominator stopped 31 hours ago
+and whose rate is therefore unusable rather than low. The flag now means only
+the second, and a test asserts an unreliable channel draws no line and claims no
+comparison.
+
+Also fixed: the heat grid was flex rows, so adjacent same-band cells in a column
+ran together into one vertical block and the picture implied a duration no row
+had reported. It is one CSS grid now, and the capture script asserts every cell
+in a column shares a left edge with its axis tick.

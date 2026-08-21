@@ -173,6 +173,7 @@ export function Workspace({ gaps }: { gaps: DemoGap[] }) {
   return (
     <AppShell
       className={`density-${density}`}
+      current="/inbox"
       title="Inbox"
       inboxCount={visible.length}
       meta={`as of ${dateTime(DEMO_AS_OF)} · ${count(DEMO_SOURCES.length)} sources · ${count(staleSources)} not healthy`}

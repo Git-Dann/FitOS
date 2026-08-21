@@ -13,6 +13,7 @@
     "issue-token": "tsx scripts/issue-token.ts"
   },
   "dependencies": {
+    "@fitos/charts": "workspace:*",
     "@fitos/contracts": "workspace:*",
     "@fitos/ui": "workspace:*",
     "better-auth": "^1.7.0",

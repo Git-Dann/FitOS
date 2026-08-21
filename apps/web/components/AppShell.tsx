@@ -20,7 +20,8 @@ interface NavEntry {
 }
 
 const PRIMARY: NavEntry[] = [
-  { label: "Inbox", glyph: "⌂", href: "/" },
+  { label: "Operations", glyph: "◎", href: "/" },
+  { label: "Inbox", glyph: "⌂", href: "/inbox" },
   { label: "Gaps", glyph: "⚑" },
   { label: "Explore", glyph: "⌕" },
   { label: "Metrics", glyph: "∑", href: "/metrics" },

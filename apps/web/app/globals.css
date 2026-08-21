@@ -1695,3 +1695,398 @@ textarea.control[aria-invalid="true"] {
     }
   }
 }
+
+/* --- the Operations Radar (Concept B) ------------------------------------- */
+
+.radar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 1px;
+  background: var(--border-default);
+}
+
+.radar-channels {
+  grid-column: 1 / -1;
+}
+
+/* Every chart goes through this frame, so the frame is where §7's six parts
+   get their layout: title and scale above the marks, summary and provenance
+   below them, the data table behind a disclosure. */
+.chart {
+  margin: 0;
+  padding: var(--space-4) var(--gutter) var(--space-3);
+  background: var(--bg-canvas);
+  min-width: 0;
+}
+
+.chart-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.chart-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: var(--track-lg);
+  color: var(--fg-default);
+}
+
+/* The scale, stated. §7 requires it and the legacy prototype never had one. */
+.chart-scale {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.chart-partial {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--radius-subtle);
+  background: var(--bg-raised);
+  font-size: var(--text-xs);
+  color: var(--warning);
+  max-width: 78ch;
+}
+
+.chart-plot {
+  min-width: 0;
+}
+
+.chart-caption {
+  margin-top: var(--space-3);
+}
+
+/* The summary is shown, not only announced: a sentence good enough for a screen
+   reader is usually the sentence a skimming reader wanted anyway. */
+.chart-summary {
+  margin: 0 0 var(--space-1-5);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  max-width: 82ch;
+  line-height: 1.5;
+}
+
+.chart-provenance {
+  margin: 0;
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+}
+
+.chart-table summary {
+  margin-top: var(--space-2);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  cursor: pointer;
+}
+
+.chart-table[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+.chart-empty,
+.ranking-unpriced {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  max-width: 72ch;
+  line-height: 1.5;
+}
+
+/* --- heat grid ------------------------------------------------------------ */
+
+.heat {
+  --heat-label-width: 168px;
+}
+
+.heat-grid {
+  display: grid;
+  gap: 3px;
+  align-items: center;
+}
+
+.heat-axis-tick {
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  text-align: center;
+}
+
+.heat-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+  padding-right: var(--space-2);
+  min-width: 0;
+}
+
+.heat-ref {
+  font-size: var(--text-2xs);
+  color: var(--fg-muted);
+  flex: none;
+}
+
+.heat-scope {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.heat-cell {
+  display: block;
+  text-decoration: none;
+  border-radius: 2px;
+  min-width: 0;
+}
+
+.heat-cell:hover .cell {
+  outline: 1px solid var(--fg-default);
+  outline-offset: 1px;
+}
+
+.cell {
+  display: block;
+  height: 20px;
+  border-radius: 2px;
+}
+
+/* Three bands and an unknown. The bands step up in weight rather than through a
+   hue rainbow, and the key names every one in words (§9). */
+.cell-normal {
+  background: var(--bg-raised);
+}
+
+.cell-elevated {
+  background: var(--status-progress);
+  opacity: 0.5;
+}
+
+.cell-pressure {
+  background: var(--status-urgent);
+}
+
+/* A missing reading is drawn. An hour that did not report and an hour that was
+   quiet must never look the same — no-silent-failure at one square. */
+.cell-unknown {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--border-default),
+    var(--border-default) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+  border: 1px dashed var(--border-strong);
+}
+
+.heat-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-3);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+}
+
+.heat-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+.heat-key-item .cell {
+  width: 16px;
+  height: 11px;
+}
+
+/* --- exposure ranking ---------------------------------------------------- */
+
+.ranking {
+  --ranking-label-width: 180px;
+}
+
+.ranking-axis {
+  position: relative;
+  height: 14px;
+  /* The right gutter matches the value and confidence columns, so the last tick
+     has somewhere to sit instead of being clipped by the panel edge. */
+  margin: 0 148px var(--space-1) var(--ranking-label-width);
+  margin-bottom: var(--space-1);
+}
+
+.ranking-tick:last-child {
+  transform: translateX(-30%);
+}
+
+.ranking-tick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: var(--text-2xs);
+  color: var(--fg-subtle);
+  white-space: nowrap;
+}
+
+.ranking-row {
+  display: grid;
+  grid-template-columns: var(--ranking-label-width) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 26px;
+}
+
+.ranking-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.ranking-scope {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-track {
+  position: relative;
+  height: 12px;
+  min-width: 0;
+}
+
+.ranking-gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-default);
+}
+
+/* A range, never a bar from zero: a bar from zero to a base figure is a point
+   estimate wearing a chart's clothes. */
+.ranking-range {
+  position: absolute;
+  top: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--fg-muted);
+}
+
+.ranking-base {
+  position: absolute;
+  top: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--fg-default);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.ranking-value {
+  font-size: var(--text-xs);
+  color: var(--fg-default);
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* --- channel strip ------------------------------------------------------- */
+
+.channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+
+.channel {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-standard);
+  min-width: 0;
+}
+
+.channel-label {
+  margin: 0;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--track-upper);
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.channel-reading {
+  margin: 2px 0 var(--space-1);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: var(--track-xl);
+  color: var(--fg-default);
+}
+
+.spark {
+  display: block;
+  stroke: var(--fg-muted);
+  fill: var(--fg-muted);
+  overflow: visible;
+}
+
+.channel-nodata {
+  margin: 0;
+  font-size: var(--text-2xs);
+  color: var(--warning);
+  line-height: 1.4;
+}
+
+.channel-delta,
+.channel-gaps,
+.channel-metric {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.channel-nocompare {
+  color: var(--fg-subtle);
+}
+
+.channel-gaps {
+  color: var(--fg-subtle);
+}
+
+.channel-metric {
+  margin-top: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1080px) {
+  .radar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .heat {
+    --heat-label-width: 104px;
+  }
+  .ranking {
+    --ranking-label-width: 120px;
+  }
+  .ranking-axis {
+    margin-left: 0;
+  }
+  .ranking-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 2px;
+  }
+  .ranking-track {
+    grid-column: 1 / -1;
+  }
+}

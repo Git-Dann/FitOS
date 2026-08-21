@@ -39,7 +39,8 @@ const REFLOW_WIDTHS = [390, 320];
 const THEMES = ["dark", "light"];
 
 const ROUTES = [
-  { slug: "inbox", url: "/", expect: "Estimated exposure" },
+  { slug: "radar", url: "/", expect: "Pressure by scope and hour" },
+  { slug: "inbox", url: "/inbox", expect: "Estimated exposure" },
   { slug: "metrics", url: "/metrics", expect: "Metric" },
   { slug: "sources", url: "/sources", expect: "Source" },
 ];
@@ -120,7 +121,7 @@ for (const route of ROUTES) {
 // The frontline payload, which is the state most likely to regress silently:
 // it is the one where the interesting fields are absent rather than wrong.
 {
-  const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark", {
+  const page = await open(browser, base + "/inbox", { width: 1440, height: 900 }, "dark", {
     deviceScaleFactor: 2,
   });
   await selectRole(page, "frontline");
@@ -134,7 +135,7 @@ for (const route of ROUTES) {
 
 // A severity filter applied, so the review sees the narrowed state too.
 {
-  const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark", {
+  const page = await open(browser, base + "/inbox", { width: 1440, height: 900 }, "dark", {
     deviceScaleFactor: 2,
   });
   await page.click(".sev-pill-critical");
@@ -145,7 +146,7 @@ for (const route of ROUTES) {
 
 // The command menu, which the source spec calls the soul of the app.
 {
-  const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark", {
+  const page = await open(browser, base + "/inbox", { width: 1440, height: 900 }, "dark", {
     deviceScaleFactor: 2,
   });
   await page.keyboard.press("Control+k");
@@ -160,7 +161,7 @@ for (const route of ROUTES) {
 
 // Comfortable density, which is the only place the recommended action shows.
 {
-  const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark", {
+  const page = await open(browser, base + "/inbox", { width: 1440, height: 900 }, "dark", {
     deviceScaleFactor: 2,
   });
   await page.click('.density-switch button:has-text("comfortable")');
@@ -179,7 +180,7 @@ for (const route of ROUTES) {
 
 // Compact is the default, and its row must be the spec's 44px.
 {
-  const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark");
+  const page = await open(browser, base + "/inbox", { width: 1440, height: 900 }, "dark");
   const box = await page.locator(".gap-row").first().boundingBox();
   if (!box || box.height < 43 || box.height > 46) {
     failures.push(`compact density: row is ${box?.height ?? "?"}px, expected 44`);
@@ -192,7 +193,7 @@ for (const route of ROUTES) {
 // that preceded the Linear refactor, so nine children were being laid into two
 // tracks. Nothing overflowed, so nothing failed.
 {
-  const page = await open(browser, base + "/", { width: 390, height: 844 }, "dark");
+  const page = await open(browser, base + "/inbox", { width: 390, height: 844 }, "dark");
   const row = await page.evaluate(() => {
     const el = document.querySelector(".gap-row");
     if (!el) return null;
@@ -249,7 +250,7 @@ for (const route of ROUTES) {
 // Frontline at 390: the one combination where §5's 48px touch rule binds, and
 // the one nobody had captured.
 {
-  const page = await open(browser, base + "/", { width: 390, height: 844 }, "dark", {
+  const page = await open(browser, base + "/inbox", { width: 390, height: 844 }, "dark", {
     deviceScaleFactor: 2,
   });
   await selectRole(page, "frontline");
@@ -268,12 +269,42 @@ for (const route of ROUTES) {
 // The empty result. §8: a filter that matched nothing and a ledger with nothing
 // in it must not look the same, and only one of them is good news.
 {
-  const page = await open(browser, base + "/", { width: 1440, height: 900 }, "dark", {
+  const page = await open(browser, base + "/inbox", { width: 1440, height: 900 }, "dark", {
     deviceScaleFactor: 2,
   });
   await page.fill(".search", "zzzz-no-such-gap");
   await page.waitForTimeout(120);
   await page.screenshot({ path: path.join(outDir, "empty-filter-1440x900.png") });
+  await page.close();
+}
+
+// Every chart on the dashboard must carry all six parts of the §7 contract.
+// The props are required, so a missing one does not compile — but an empty
+// string does, and an empty provenance line is exactly as useless as none.
+{
+  const page = await open(browser, base + "/", { width: 1440, height: 1000 }, "dark");
+  const charts = await page.evaluate(() =>
+    [...document.querySelectorAll(".chart")].map((chart) => ({
+      title: chart.querySelector(".chart-title")?.textContent?.trim() ?? "",
+      scale: chart.querySelector(".chart-scale")?.textContent?.trim() ?? "",
+      summary: chart.querySelector(".chart-summary")?.textContent?.trim() ?? "",
+      provenance: chart.querySelector(".chart-provenance")?.textContent?.trim() ?? "",
+      rows: chart.querySelectorAll(".chart-table tbody tr").length,
+    })),
+  );
+  if (charts.length === 0) failures.push("dashboard: no charts found");
+  for (const chart of charts) {
+    const name = chart.title || "(untitled)";
+    if (!chart.title) failures.push("chart: no title");
+    if (chart.scale.length < 8) failures.push(`${name}: no scale stated`);
+    // A summary must describe the shape in numbers, not name the chart type.
+    if (chart.summary.length < 40)
+      failures.push(`${name}: summary is ${chart.summary.length} chars`);
+    if (!/as of/.test(chart.provenance)) failures.push(`${name}: no as-of time`);
+    if (!/·/.test(chart.provenance)) failures.push(`${name}: no source attribution`);
+    if (chart.rows === 0) failures.push(`${name}: no data table`);
+  }
+  await page.screenshot({ path: path.join(outDir, "radar-full-1440x900.png"), fullPage: true });
   await page.close();
 }
 
